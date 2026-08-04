@@ -1,0 +1,45 @@
+[project]
+name = "voice-agent"
+version = "0.1.0"
+description = "In-car voice agent — device control, owner's-manual lookup and web search by voice"
+requires-python = ">=3.11"
+dependencies = [
+    "pipecat-ai[silero,openai,local]",
+    "rank-bm25",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+voice-agent = "voice_agent.__main__:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    # internal to pipecat, not our code
+    "ignore:'audioop' is deprecated:DeprecationWarning",
+    # test_metrics calls process_frame directly without Pipecat's task manager. The FAL
+    # logic runs inline so it is genuinely tested; only the internal queue is not.
+    "ignore:coroutine 'FrameProcessor.__process_frame_task_handler' was never awaited:RuntimeWarning",
+]
+
+[tool.setuptools.packages.find]
+include = ["voice_agent*"]
+
+[tool.ruff]
+line-length = 100
+exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "SIM", "RUF", "ARG", "C4", "RET", "I"]
+ignore = [
+    "E501",    # line length is handled by line-length above
+    "RUF001",  # the 'ambiguous' characters are Vietnamese text and math signs, deliberate
+    "RUF002",
+    "RUF003",
+    "SIM300",  # `0 < len(x) <= 3` is a chained comparison, not a Yoda condition
+    "ARG002",  # handle_starttag's signature is dictated by HTMLParser
+]

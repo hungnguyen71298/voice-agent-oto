@@ -1,0 +1,3 @@
+pipecat-ai[silero,openai,local]
+rank-bm25
+python-dotenv

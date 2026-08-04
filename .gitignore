@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# graphify analysis output — a working artefact, not part of the deliverable
+graphify-out/
