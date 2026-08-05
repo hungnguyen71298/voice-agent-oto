@@ -25,6 +25,7 @@ def clean_bus():
     """Module-level client list and history leak between tests otherwise."""
     ui._clients.clear()
     ui._history.clear()
+    ui._muted = False
     yield
     ui._clients.clear()
     ui._history.clear()
@@ -228,3 +229,37 @@ def test_vehicle_reset_does_not_alias_the_defaults():
     vehicle.reset_state()
     vehicle.set_ac(True, 30)
     assert vehicle.DEFAULTS["ac"] == {"on": False, "temp": 24}
+
+
+# --- mic mute -------------------------------------------------------------------------
+# Muting has to stop audio *before* the VAD, or a muted mic still triggers turns — and
+# Whisper invents text out of room noise, so those turns cost real API calls.
+
+def test_muted_mic_drops_audio_but_keeps_the_pipeline_alive():
+    from pipecat.frames.frames import InputAudioRawFrame
+
+    audio = InputAudioRawFrame(audio=b"\x00\x00", sample_rate=16000, num_channels=1)
+    other = TranscriptionFrame(text="đang nói", user_id="", timestamp="")
+    gate, pushed = ui.MicGate(), []
+
+    async def fake_push(frame, _direction=None):
+        pushed.append(frame)
+
+    gate.push_frame = fake_push
+
+    async def drive():
+        await ui._mic(None)                       # mute
+        await gate.process_frame(audio, FrameDirection.DOWNSTREAM)
+        await gate.process_frame(other, FrameDirection.DOWNSTREAM)
+        await ui._mic(None)                       # unmute
+        await gate.process_frame(audio, FrameDirection.DOWNSTREAM)
+
+    asyncio.run(drive())
+    kinds = [type(f).__name__ for f in pushed]
+    assert kinds == ["TranscriptionFrame", "InputAudioRawFrame"], kinds
+
+
+def test_mic_state_is_not_replayed_from_history():
+    """A page opening later is told the live state on connect, not every past toggle."""
+    ui.emit("mic", muted=True)
+    assert ui._history == []

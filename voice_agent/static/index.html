@@ -24,13 +24,14 @@
   .sub { color: var(--dim); font-size: .82rem; }
   #status { margin-left: auto; display: flex; align-items: center; gap: .5rem;
             font-size: .82rem; color: var(--dim); }
-  #reset { margin-left: 1rem; background: var(--panel); color: var(--dim);
+  #mic, #reset { margin-left: 1rem; background: var(--panel); color: var(--dim);
            border: 1px solid var(--line); border-radius: .4rem; cursor: pointer;
            padding: .35rem .8rem; font: inherit; font-size: .8rem;
            transition: color .15s, border-color .15s; }
-  #reset:hover { color: var(--text); border-color: var(--dim); }
-  #reset:active { transform: translateY(1px); }
-  #reset:disabled { opacity: .45; cursor: default; }
+  #mic:hover, #reset:hover { color: var(--text); border-color: var(--dim); }
+  #mic:active, #reset:active { transform: translateY(1px); }
+  #mic:disabled, #reset:disabled { opacity: .45; cursor: default; }
+  #mic.muted { color: #e8705a; border-color: #e8705a; }
   #dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--dim);
          transition: background .2s; }
   #dot.live { background: var(--accent); box-shadow: 0 0 0 4px rgba(77,212,172,.15); }
@@ -88,6 +89,7 @@
   <h1>Voice Agent</h1>
   <span class="sub">VinFast VF 8 · trợ lý ảo trên xe</span>
   <span id="status"><span id="dot"></span><span id="statusText">đang kết nối…</span></span>
+  <button id="mic" title="Tắt/bật micro — agent vẫn chạy">🎙 Mic</button>
   <button id="reset" title="Xoá hội thoại, đưa xe về mặc định">↺ Reset</button>
 </header>
 
@@ -193,6 +195,23 @@ $("reset").onclick = async () => {
   b.disabled = false;
 };
 
+// Muting drops the audio before the VAD sees it, so the agent stays up and the
+// conversation context survives — the server owns the flag, the page only asks.
+$("mic").onclick = async () => {
+  const b = $("mic");
+  b.disabled = true;
+  try { await fetch("/mic", { method: "POST" }); }
+  catch { setDot("", "đổi mic thất bại"); }
+  b.disabled = false;
+};
+
+function setMic(muted) {
+  const b = $("mic");
+  b.classList.toggle("muted", muted);
+  b.textContent = muted ? "🔇 Mic tắt" : "🎙 Mic";
+  if (muted) setDot("", "mic đang tắt");
+}
+
 function clearLog() {
   samples.length = 0;
   log.innerHTML = '<p class="empty">Nói vào micro để bắt đầu.</p>';
@@ -207,6 +226,7 @@ es.onerror = () => setDot("", "mất kết nối");
 es.onmessage = e => {
   const d = JSON.parse(e.data);
   if (d.kind === "state") setState(d);
+  else if (d.kind === "mic") setMic(d.muted);
   else if (d.kind === "user") { setDot("live", "đang xử lý"); row("user", "🎤", d.text); }
   else if (d.kind === "bot") { setDot("live", "sẵn sàng"); row("bot", "🔊", d.text); }
   else if (d.kind === "tool") row("tool", "🔧", `${d.name}(${d.args}) → ${d.result}`);

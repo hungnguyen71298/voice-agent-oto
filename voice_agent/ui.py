@@ -18,6 +18,7 @@ from loguru import logger
 from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     Frame,
+    InputAudioRawFrame,
     InterruptionFrame,
     TranscriptionFrame,
     TTSTextFrame,
@@ -39,7 +40,7 @@ _MAX_HISTORY = 60  # a browser opened mid-demo should see the conversation so fa
 def emit(kind: str, **data) -> None:
     """Broadcast one event to every open page. Safe to call when nobody is watching."""
     event = {"kind": kind, **data}
-    if kind not in ("state", "reset"):  # snapshots and one-shot signals are not history
+    if kind not in ("state", "reset", "mic"):  # snapshots and one-shot signals are not history
         _history.append(event)
         del _history[:-_MAX_HISTORY]
     for q in _clients:
@@ -103,6 +104,35 @@ class UIProbe(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
+_muted = False
+
+
+class MicGate(FrameProcessor):
+    """Drops microphone audio while muted. Sits between the transport and the VAD.
+
+    Dropping here rather than closing the device keeps the pipeline, the dashboard and
+    the conversation context alive — unmuting is instant and nothing is rebuilt. VAD
+    sees no audio at all, so a muted mic cannot trigger a turn: worth having because
+    Whisper invents text out of room noise (it returns YouTube sign-off lines it learnt
+    from subtitles), and that costs an API call for something nobody said.
+    """
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+        if _muted and isinstance(frame, InputAudioRawFrame):
+            return
+        await self.push_frame(frame, direction)
+
+
+async def _mic(_request: web.Request) -> web.Response:
+    """Toggle the microphone from the dashboard."""
+    global _muted
+    _muted = not _muted
+    emit("mic", muted=_muted)
+    print(f"  🎙 mic {'tắt' if _muted else 'bật'}", flush=True)
+    return web.json_response({"muted": _muted})
+
+
 def set_reset_handler(handler) -> None:
     """Register what the dashboard's reset button should do."""
     global _on_reset
@@ -132,7 +162,7 @@ async def _events(request: web.Request) -> web.StreamResponse:
     queue: asyncio.Queue = asyncio.Queue(maxsize=200)
     _clients.append(queue)
     try:
-        for event in [*_history, {"kind": "state", **STATE}]:
+        for event in [*_history, {"kind": "state", **STATE}, {"kind": "mic", "muted": _muted}]:
             await response.write(f"data: {json.dumps(event)}\n\n".encode())
         while True:
             event = await queue.get()
@@ -151,6 +181,7 @@ async def start(port: int, host: str = "127.0.0.1") -> web.AppRunner | None:
     app = web.Application()
     app.router.add_get("/events", _events)
     app.router.add_post("/reset", _reset)
+    app.router.add_post("/mic", _mic)
     # No-cache: the page is edited during a demo and a stale copy from the browser
     # cache looks exactly like a feature that was never added.
     app.router.add_get("/", lambda _: web.FileResponse(
