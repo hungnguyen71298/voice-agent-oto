@@ -196,7 +196,8 @@ def write_wav(path: pathlib.Path, pcm: bytes, rate: int):
 
 async def main(keep_audio: pathlib.Path | None) -> int:
     if not config.OPENROUTER_KEY:
-        sys.exit("Missing OPENROUTER_API_KEY — see .env.example")
+        sys.exit("OPENROUTER_API_KEY is missing or still the placeholder.\n"
+                 "  cp .env.example .env   then paste a real key from https://openrouter.ai/keys")
 
     print(f"STT={config.STT_MODEL}  LLM={config.LLM_MODEL}  "
           f"TTS={config.TTS_ENGINE}/{config.PIPER_VOICE}\n", flush=True)

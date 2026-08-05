@@ -155,7 +155,8 @@ async def run_task(task: PipelineTask, *, auto_end: bool = True):
 
 async def run():
     if not config.OPENROUTER_KEY:
-        sys.exit("Missing OPENROUTER_API_KEY — see .env.example")
+        sys.exit("OPENROUTER_API_KEY is missing or still the placeholder.\n"
+                 "  cp .env.example .env   then paste a real key from https://openrouter.ai/keys")
 
     task, probe = build_task()
     runner = await ui.start(config.UI_PORT, config.UI_HOST)

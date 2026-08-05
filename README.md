@@ -54,7 +54,7 @@ Windows: `$env:PYTHONIOENCODING="utf-8"` nếu console vỡ font tiếng Việt.
 Không cần API key, không cần mic:
 
 ```bash
-.venv/bin/python -m pytest        # 101 test
+.venv/bin/python -m pytest        # 107 test
 .venv/bin/python -m ruff check .  # lint
 ```
 
@@ -66,6 +66,7 @@ Không cần API key, không cần mic:
 | `tests/test_metrics.py` | đo FAL đúng frame đầu tiên, bỏ lượt khi barge-in, probe không chặn frame |
 | `tests/test_vehicle.py` | câu xác nhận `speech` có mặt trên đường thành công, vắng mặt trên đường lỗi và trên tool tra cứu |
 | `tests/test_ui.py` | dashboard không nuốt frame, tab treo không chặn pipeline, mọi hình dạng kết quả tool đều đọc được |
+| `tests/test_config.py` | placeholder key trong .env.example phải bị coi như thiếu key |
 | `tests/test_packaging.py` | mọi thư viện được import đều có trong requirements — bắt lỗi "chạy máy tôi thì được" |
 
 ## Cấu hình
@@ -248,7 +249,7 @@ scripts/bench.py         đo latency + xếp hạng giọng, không cần mic
 scripts/demo_ui.py       phát lại hội thoại mẫu vào dashboard, không cần mic
 scripts/e2e.py           chạy nguyên pipeline với giọng thu sẵn
 scripts/mic.py           tìm thiết bị mic thật sự nghe được
-tests/                   101 test, không cần API key
+tests/                   107 test, không cần API key
 docs/                    cài đặt · kiến trúc · quyết định · kết quả đo
 ```
 

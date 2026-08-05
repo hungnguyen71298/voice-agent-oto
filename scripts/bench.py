@@ -225,7 +225,8 @@ async def compare_voices() -> int:
 
 async def main(repeat: int) -> int:
     if not config.OPENROUTER_KEY:
-        sys.exit("Missing OPENROUTER_API_KEY — see .env.example")
+        sys.exit("OPENROUTER_API_KEY is missing or still the placeholder.\n"
+                 "  cp .env.example .env   then paste a real key from https://openrouter.ai/keys")
     voice = config.PIPER_VOICE if config.TTS_ENGINE == "piper" else config.EDGE_VOICE
     print(f"STT={config.STT_MODEL}\nLLM={config.LLM_MODEL}\n"
           f"TTS={config.TTS_ENGINE}/{voice}\n")

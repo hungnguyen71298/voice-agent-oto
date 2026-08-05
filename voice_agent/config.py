@@ -13,7 +13,23 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 KB_DIR = pathlib.Path(os.environ.get("KB_DIR", ROOT / "data" / "kb"))
 
 OPENROUTER_BASE = os.environ.get("OPENROUTER_BASE", "https://openrouter.ai/api/v1")
-OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY")
+
+
+def _real_key(name: str) -> str:
+    """An unedited placeholder counts as no key at all.
+
+    `.env.example` ships `OPENROUTER_API_KEY=sk-or-v1-...`, and the README says to copy
+    the file. Someone who copies it and forgets to paste their own key used to get an
+    agent that started, printed its banner, opened the microphone — and then failed every
+    single turn with a 401 buried in debug logs. Verified on a fresh clone: the run looks
+    healthy and does nothing.
+    """
+    value = (os.environ.get(name) or "").strip()
+    return "" if value.endswith("...") else value
+
+
+OPENROUTER_KEY = _real_key("OPENROUTER_API_KEY")
+TAVILY_KEY = _real_key("TAVILY_API_KEY")
 TAVILY_KEY = os.environ.get("TAVILY_API_KEY")
 # Defaults picked from measurement, not from the docs — see docs/quyet-dinh.md.
 # STT: 3s clip, 3 runs. whisper-large-v3 0.67-0.76s (stable); gpt-4o-mini-transcribe
