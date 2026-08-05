@@ -50,7 +50,9 @@ def guard(result: dict) -> dict:
     """Label an untrusted tool result as data. Everything but our own keys gets fenced."""
     ours = {"status", "message", "mock", "note"}  # written here, not by the source
     out = {k: (v if k in ours else _fence(v)) for k, v in result.items()}
-    return out | {"note": _NOTE} if any(k not in ours for k in out) else out
+    if any(k not in ours for k in result):
+        out["note"] = _NOTE
+    return out
 
 
 def dispatch(name: str, args: dict) -> dict:
