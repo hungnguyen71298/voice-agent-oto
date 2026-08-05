@@ -54,7 +54,7 @@ Windows: `$env:PYTHONIOENCODING="utf-8"` nếu console vỡ font tiếng Việt.
 Không cần API key, không cần mic:
 
 ```bash
-.venv/bin/python -m pytest        # 99 test
+.venv/bin/python -m pytest        # 101 test
 .venv/bin/python -m ruff check .  # lint
 ```
 
@@ -248,7 +248,7 @@ scripts/bench.py         đo latency + xếp hạng giọng, không cần mic
 scripts/demo_ui.py       phát lại hội thoại mẫu vào dashboard, không cần mic
 scripts/e2e.py           chạy nguyên pipeline với giọng thu sẵn
 scripts/mic.py           tìm thiết bị mic thật sự nghe được
-tests/                   99 test, không cần API key
+tests/                   101 test, không cần API key
 docs/                    cài đặt · kiến trúc · quyết định · kết quả đo
 ```
 
