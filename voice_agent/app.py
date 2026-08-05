@@ -19,7 +19,7 @@ from pipecat.transcriptions.language import Language
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransportParams
 
-from . import audio, config, tools, ui
+from . import audio, budget, config, tools, ui
 from . import tts as tts_engine
 from .metrics import LatencyProbe
 from .schema import to_schema
@@ -113,9 +113,11 @@ def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, La
     # Two UIProbes, because no single point sees the whole turn: the user aggregator
     # consumes TranscriptionFrame, so the transcript has to be read before it, and the
     # spoken text only exists after TTS. Each probe ignores the frames it never sees.
+    money = budget.Budget(config.MAX_TURNS, config.MAX_TOKENS)
     task = PipelineTask(
         Pipeline([transport.input(), VADProcessor(vad_analyzer=SileroVADAnalyzer()),
-                  stt, ui.UIProbe(), agg.user(), llm, tts, probe, ui.UIProbe(),
+                  stt, ui.UIProbe(), agg.user(), budget.Gate(money), llm,
+                  budget.Counter(money), tts, probe, ui.UIProbe(),
                   transport.output(), agg.assistant()]),
         params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
         # Pipecat cancels the pipeline after 300s with no speech. Sensible for a phone
