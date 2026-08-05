@@ -12,9 +12,11 @@ from pipecat.pipeline.task import PipelineTask
 from pipecat.pipeline.worker import PipelineParams
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.audio.vad_processor import VADProcessor
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openai.stt import OpenAISTTService
 from pipecat.transcriptions.language import Language
+from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransportParams
 
 from . import config, tools, ui
@@ -24,10 +26,26 @@ from .schema import to_schema
 from .tools.vehicle import describe_state
 
 
-def build_task() -> tuple[PipelineTask, LatencyProbe]:
-    """Assemble the pipeline. Split out from `run()` so tests and benchmarks can reuse it."""
-    transport = LocalAudioTransport(LocalAudioTransportParams(
-        audio_in_enabled=True, audio_out_enabled=True, vad_analyzer=SileroVADAnalyzer()))
+def transport_params() -> LocalAudioTransportParams:
+    """Audio settings shared by the live microphone and the file-driven e2e run.
+
+    No `vad_analyzer` here on purpose. Pipecat 1.7 removed it from `TransportParams`
+    and moved voice activity detection into its own `VADProcessor` in the pipeline —
+    but the field is still accepted silently, so passing it looks correct and does
+    nothing. `scripts/e2e.py` is what caught that.
+    """
+    return LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True)
+
+
+def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, LatencyProbe]:
+    """Assemble the pipeline.
+
+    Args:
+        transport: Audio in and out. Defaults to the local microphone and speaker;
+            `scripts/e2e.py` passes a file-backed one so the whole pipeline can be
+            exercised without anybody speaking.
+    """
+    transport = transport or LocalAudioTransport(transport_params())
     stt = OpenAISTTService(
         api_key=config.OPENROUTER_KEY, base_url=config.OPENROUTER_BASE,
         settings=OpenAISTTService.Settings(model=config.STT_MODEL, language=Language.VI))
@@ -68,11 +86,33 @@ def build_task() -> tuple[PipelineTask, LatencyProbe]:
 
     probe = LatencyProbe(on_sample=on_fal)
 
+    # VADProcessor turns raw audio into VADUserStarted/StoppedSpeaking frames; the user
+    # aggregator downstream promotes those to the UserStoppedSpeakingFrame that starts the
+    # FAL clock. Remove it and the pipeline goes silent — audio flows, nothing reacts.
+    #
+    # Two UIProbes, because no single point sees the whole turn: the user aggregator
+    # consumes TranscriptionFrame, so the transcript has to be read before it, and the
+    # spoken text only exists after TTS. Each probe ignores the frames it never sees.
     task = PipelineTask(
-        Pipeline([transport.input(), stt, agg.user(), llm, tts, probe, ui.UIProbe(),
+        Pipeline([transport.input(), VADProcessor(vad_analyzer=SileroVADAnalyzer()),
+                  stt, ui.UIProbe(), agg.user(), llm, tts, probe, ui.UIProbe(),
                   transport.output(), agg.assistant()]),
         params=PipelineParams(enable_metrics=True, enable_usage_metrics=True))
     return task, probe
+
+
+async def run_task(task: PipelineTask, *, auto_end: bool = True):
+    """Run a built pipeline to completion. Separated so e2e can drive one it owns.
+
+    Args:
+        task: The pipeline to run.
+        auto_end: Pipecat's default ends the runner as soon as every root worker is
+            finished. A live microphone never finishes, so that is right here — but a
+            file-backed transport is "finished" the moment it is started, which cancels
+            the pipeline before a single frame goes in. `scripts/e2e.py` passes False
+            and sends its own `EndFrame`.
+    """
+    await PipelineRunner(handle_sigint=True).run(task, auto_end=auto_end)
 
 
 async def run():
@@ -88,7 +128,7 @@ async def run():
           f"KB={len(tools.knowledge.DOCS)} chunks\nDashboard: {dashboard}\n\n"
           f"Start speaking (Ctrl+C to quit)...", flush=True)
     try:
-        await PipelineRunner(handle_sigint=True).run(task)
+        await run_task(task)
     finally:
         if runner:
             await runner.cleanup()

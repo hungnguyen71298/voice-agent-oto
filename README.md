@@ -11,8 +11,8 @@ mic ─► SileroVAD ─► STT ─► LLM (+tool calling) ─┬─► TTS (Pip
                     tools/  vehicle mock · BM25 knowledge base · search
 ```
 
-Chi tiết: [`docs/kien-truc.md`](docs/kien-truc.md) · lý do từng lựa chọn:
-[`docs/quyet-dinh.md`](docs/quyet-dinh.md)
+[Cài đặt](docs/cai-dat.md) · [Kiến trúc](docs/kien-truc.md) ·
+[Quyết định kỹ thuật](docs/quyet-dinh.md) · [Kết quả đo](docs/ket-qua.md)
 
 ## Cài đặt
 
@@ -53,7 +53,7 @@ Windows: `$env:PYTHONIOENCODING="utf-8"` nếu console vỡ font tiếng Việt.
 Không cần API key, không cần mic:
 
 ```bash
-.venv/bin/python -m pytest        # 82 test
+.venv/bin/python -m pytest        # 84 test
 .venv/bin/python -m ruff check .  # lint
 ```
 
@@ -65,6 +65,7 @@ Không cần API key, không cần mic:
 | `tests/test_metrics.py` | đo FAL đúng frame đầu tiên, bỏ lượt khi barge-in, probe không chặn frame |
 | `tests/test_vehicle.py` | câu xác nhận `speech` có mặt trên đường thành công, vắng mặt trên đường lỗi và trên tool tra cứu |
 | `tests/test_ui.py` | dashboard không nuốt frame, tab treo không chặn pipeline, mọi hình dạng kết quả tool đều đọc được |
+| `tests/test_packaging.py` | mọi thư viện được import đều có trong requirements — bắt lỗi "chạy máy tôi thì được" |
 
 ## Cấu hình
 
@@ -115,12 +116,16 @@ output buffer (~20-40ms) nên số báo lạc quan hơn thực tế một chút.
 chấm luôn độ chính xác STT.
 
 ```bash
-.venv/bin/python scripts/bench.py --repeat 3
-TTS_ENGINE=edge .venv/bin/python scripts/bench.py     # so sánh engine
+.venv/bin/python scripts/e2e.py --keep-audio out      # nguyên pipeline, không cần mic
+.venv/bin/python scripts/bench.py --repeat 3          # từng chặng mạng
 .venv/bin/python scripts/bench.py --voices            # xếp hạng giọng đọc
 ```
 
-Đo trên máy dev tại Việt Nam, `--repeat 3`, n=9:
+**End-to-end, nguyên pipeline** (`scripts/e2e.py`, 5 lượt hội thoại thật):
+**FAL p50 1016–1172 ms**, p95 2672–3203 ms, **5/5 lượt đạt**. Chi tiết:
+[`docs/ket-qua.md`](docs/ket-qua.md).
+
+Từng chặng riêng (`scripts/bench.py --repeat 3`, n=9):
 
 | | p50 | min | max |
 |---|---|---|---|
@@ -233,8 +238,9 @@ data/samples/            3 file nghe thử giọng
 scripts/fetch_kb.py      nạp KB từ om.vinfastauto.com
 scripts/bench.py         đo latency + xếp hạng giọng, không cần mic
 scripts/demo_ui.py       phát lại hội thoại mẫu vào dashboard, không cần mic
-tests/                   82 test, không cần API key
-docs/                    kiến trúc + lý do các quyết định
+scripts/e2e.py           chạy nguyên pipeline với giọng thu sẵn
+tests/                   84 test, không cần API key
+docs/                    cài đặt · kiến trúc · quyết định · kết quả đo
 ```
 
 **Thêm tool = thêm 1 hàm** vào module trong `tools/` rồi đưa vào `TOOLS` của

@@ -1,5 +1,11 @@
 pipecat-ai[silero,openai,local,piper]
-aiohttp          # dashboard; also a pipecat dependency, pinned here because we import it
-edge-tts
-rank-bm25
-python-dotenv
+
+# Imported directly by this codebase, so declared here rather than inherited from
+# pipecat's dependency tree. tests/test_packaging.py enforces that this list stays complete.
+aiohttp          # dashboard SSE server
+av               # decodes Edge TTS mp3 to PCM
+edge-tts         # TTS_ENGINE=edge
+loguru           # logging, shared with pipecat
+piper-tts        # local Vietnamese TTS; scripts/e2e.py drives it directly
+python-dotenv    # .env loading
+rank-bm25        # knowledge base retrieval

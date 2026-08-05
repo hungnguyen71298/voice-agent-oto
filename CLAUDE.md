@@ -8,7 +8,8 @@ Always use the venv interpreter — this machine has a second Python (Miniconda)
 and running bare `python` silently picks it up and fails on missing dependencies.
 
 ```bash
-.venv/Scripts/python -m pytest              # 47 tests, no API key, no mic needed
+.venv/Scripts/python -m pytest              # 84 tests, no API key, no mic needed
+.venv/Scripts/python scripts/e2e.py         # whole pipeline, recorded speech, needs the key
 .venv/Scripts/python -m ruff check .         # lint — config in pyproject.toml
 .venv/Scripts/python -m voice_agent         # run the agent (needs OPENROUTER_API_KEY)
 .venv/Scripts/python scripts/fetch_kb.py VF9 2026   # rebuild data/kb/
