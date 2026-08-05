@@ -3,24 +3,29 @@
 ## 1. Tổng thể
 
 ```
-┌──────────────────────── máy người dùng (trên xe) ────────────────────────┐
-│                                                                          │
-│   mic ──► LocalAudioTransport ──► SileroVAD ──┐                          │
-│                                                │                          │
-│   loa ◄── LocalAudioTransport ◄── LatencyProbe ◄──┐                      │
-│                                                    │                      │
-│                        tools/  (vehicle mock, BM25 KB)                    │
-│                              ▲          │                                 │
+┌──────────────────────── máy người dùng (trên xe) ─────────────────────────┐
+│                                                                           │
+│   mic ──► LocalAudioTransport ──► SileroVAD ──┐                           │
+│                                               │                           │
+│   loa ◄── LocalAudioTransport ◄── LatencyProbe ◄── Piper TTS ◄─┐          │
+│                                                                │          │
+│                        tools/  (vehicle mock, BM25 KB) ────────┘          │
+│                              ▲          │       câu xác nhận đọc thẳng     │
 └──────────────────────────────┼──────────┼─────────────────────────────────┘
                                │          │
                     ┌──────────┴──────────▼──────────┐
-                    │      OpenRouter (1 API key)     │
-                    │  STT  ──►  LLM  ──►  TTS        │
-                    └─────────────────────────────────┘
+                    │      OpenRouter (1 API key)    │
+                    │        STT  ──►  LLM           │
+                    └────────────────────────────────┘
 ```
 
-Toàn bộ xử lý âm thanh, VAD, tool execution và knowledge base chạy **local**.
-Chỉ 3 lời gọi mạng ra ngoài: STT, LLM, TTS — đều qua một endpoint OpenRouter.
+Xử lý âm thanh, VAD, **TTS**, tool execution và knowledge base đều chạy **local**.
+Chỉ hai lời gọi mạng ra ngoài: STT và LLM, qua cùng một endpoint OpenRouter.
+
+TTS không đi qua OpenRouter vì OpenRouter **không có giọng tiếng Việt nào** — đã
+kiểm chứng bằng cách gọi thẳng `/audio/speech`: chỉ nhận `hexgrad/kokoro-82m`
+(8 ngôn ngữ, không có `vi`) và `deepgram/aura-2` (5 ngôn ngữ châu Âu). Bảng đo các
+phương án thay thế nằm trong `voice_agent/config.py`.
 
 ## 2. Luồng xử lý voice
 
@@ -40,10 +45,12 @@ Chỉ 3 lời gọi mạng ra ngoài: STT, LLM, TTS — đều qua một endpoin
       ├─ aggregator ghép transcript vào lịch sử hội thoại
       │
       ├─ LLM   stream ────────────────────► OpenRouter
-      │         ├─ nếu trả tool_call → dispatch() → kết quả → gọi LLM lượt 2
-      │         └─ nếu trả text      → đẩy thẳng sang TTS
+      │         ├─ trả text     → đẩy thẳng sang TTS
+      │         └─ trả tool_call → dispatch()
+      │              ├─ kết quả có "speech"  → đọc thẳng, KHÔNG gọi LLM lượt 2
+      │              └─ kết quả không có     → gửi lại cho LLM diễn đạt
       │
-      ├─ TTS   stream PCM 24kHz ──────────► OpenRouter
+      ├─ TTS   Piper sinh PCM 22.05kHz ngay trên máy
       │
  t=A  frame audio đầu tiên tới LatencyProbe → ghi FAL = A − T
       │
@@ -103,6 +110,34 @@ không raise mà âm thầm coi chuỗi là truthy.
 Mọi hàm validate xong mới mutate `STATE` — đường lỗi không được để lại thay đổi
 một nửa. Đây là lỗi đã xảy ra thật và có test riêng (`test_vehicle.py`).
 
+### Đường tắt `speech`: bỏ vòng LLM thứ hai
+
+Vòng đời chuẩn của một tool call là hai lời gọi LLM: một để model quyết định gọi
+tool, một để nó đọc kết quả và diễn đạt thành câu. Với lệnh điều khiển thiết bị,
+lời gọi thứ hai không thêm thông tin gì — kết quả `{"temp": 22}` chỉ có đúng một
+cách nói. Nhưng nó tốn nguyên một vòng mạng: **LLM p50 2517ms → 984ms** sau khi bỏ.
+
+Nên mỗi tool điều khiển trả kèm trường `speech` — câu xác nhận viết sẵn:
+
+```python
+{"device": "ac", "status": "success", "speech": "Đã giảm còn 22 độ", "temp": 22}
+```
+
+`app.py` thấy `speech` thì đẩy `TTSSpeakFrame(speech, append_to_context=True)` và
+trả kết quả kèm `FunctionCallResultProperties(run_llm=False)`. `append_to_context`
+là phần quan trọng: câu vừa nói vẫn vào lịch sử hội thoại, nên lượt sau nói "tăng
+thêm hai độ nữa" model vẫn hiểu.
+
+Hai loại kết quả **cố ý không** có `speech`:
+
+- **Đường lỗi.** "Nhiệt độ phải từ 16 đến 30 độ" cần model hỏi lại cho tự nhiên,
+  chứ không phải đọc nguyên câu lỗi cho người đang lái xe.
+- **Tool tra cứu.** `search_manual` trả về 3 đoạn văn bản thô; cần model tóm tắt.
+
+Ranh giới này có test (`test_vehicle.py::test_errors_carry_no_speech`,
+`test_lookup_tools_carry_no_speech`) vì thêm nhầm `speech` vào chỗ không nên có
+sẽ khiến agent đọc dữ liệu thô ra loa mà không ai phát hiện lúc review.
+
 ### Hội thoại nhiều lượt và làm rõ yêu cầu
 
 - **Ngữ cảnh**: `LLMContextAggregatorPair` giữ lịch sử hội thoại. Các tool tương
@@ -124,7 +159,31 @@ Hai điều chỉnh riêng cho tiếng Việt:
 2. **Token gồm bigram âm tiết.** Tiếng Việt tách theo âm tiết thì "áp", "suất",
    "lốp" đều quá phổ biến để phân biệt; bigram `áp_suất` mới mang nghĩa từ ghép.
 
-## 4. Điểm mở rộng
+## 4. Dashboard demo
+
+```
+pipeline ──► ui.emit(kind, ...) ──► asyncio.Queue mỗi tab ──SSE──► trình duyệt
+   ▲                                                                    │
+   └── UIProbe đứng cuối pipeline, chỉ đọc frame, luôn push_frame ──────┘
+```
+
+Trang chỉ **quan sát**. Đưa trình duyệt vào đường âm thanh sẽ thêm một chặng mạng
+vào đúng con số đề bài chấm, nên mic vẫn ở máy chạy pipeline. Hệ quả: luồng dữ liệu
+một chiều, và SSE là đủ — không cần WebSocket, không thêm thư viện (`aiohttp` đã
+là dependency của Pipecat).
+
+Ba nguyên tắc để dashboard không bao giờ làm hỏng pipeline:
+
+1. **`UIProbe` luôn `push_frame`.** Nuốt một frame là câm cả hệ thống. Có test.
+2. **`emit` dùng `put_nowait`.** Một tab treo chỉ mất sự kiện của chính nó, không
+   chặn vòng audio. Có test.
+3. **Tắt được hoàn toàn** bằng `UI_PORT=0`; pipeline không phụ thuộc vào nó.
+
+`scripts/demo_ui.py` phát lại một hội thoại mẫu vào dashboard — không mic, không
+API key. Tool trong đó chạy thật qua `dispatch` nên panel trạng thái xe hoạt động
+đúng như phiên thật; chỉ số thời gian là bịa.
+
+## 5. Điểm mở rộng
 
 | Muốn gì | Sửa ở đâu |
 |---|---|
@@ -134,3 +193,4 @@ Hai điều chỉnh riêng cho tiếng Việt:
 | KB dòng xe khác | `python scripts/fetch_kb.py VF9 2026` |
 | Retrieval chính xác hơn | rerank trong `tools/knowledge.py:search_manual` |
 | Search thật | set `TAVILY_API_KEY`, code đã sẵn |
+| Thêm thứ lên dashboard | `ui.emit(...)` ở chỗ phát sinh + 1 nhánh trong `index.html` |

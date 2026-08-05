@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Agent · VF 8</title>
+<style>
+  :root {
+    --bg: #0b0e13; --panel: #141922; --line: #232a36;
+    --text: #e6ebf2; --dim: #7c8899; --accent: #4dd4ac; --warn: #ffb454; --hot: #ff6b6b;
+    font-size: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text); min-height: 100vh; padding: 1.5rem;
+    font: 400 1rem/1.5 ui-sans-serif, "Segoe UI", system-ui, sans-serif;
+    display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+  @media (max-width: 860px) { body { grid-template-columns: 1fr; } }
+
+  header { grid-column: 1 / -1; display: flex; align-items: baseline; gap: .75rem; }
+  h1 { font-size: 1.15rem; font-weight: 600; letter-spacing: .01em; }
+  .sub { color: var(--dim); font-size: .82rem; }
+  #status { margin-left: auto; display: flex; align-items: center; gap: .5rem;
+            font-size: .82rem; color: var(--dim); }
+  #reset { margin-left: 1rem; background: var(--panel); color: var(--dim);
+           border: 1px solid var(--line); border-radius: .4rem; cursor: pointer;
+           padding: .35rem .8rem; font: inherit; font-size: .8rem;
+           transition: color .15s, border-color .15s; }
+  #reset:hover { color: var(--text); border-color: var(--dim); }
+  #reset:active { transform: translateY(1px); }
+  #reset:disabled { opacity: .45; cursor: default; }
+  #dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--dim);
+         transition: background .2s; }
+  #dot.live { background: var(--accent); box-shadow: 0 0 0 4px rgba(77,212,172,.15); }
+  #dot.hear { background: var(--warn); animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: .75rem;
+           padding: 1rem 1.15rem; }
+  .panel h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .09em;
+              color: var(--dim); font-weight: 600; margin-bottom: .85rem; }
+
+  #log { overflow-y: auto; max-height: calc(100vh - 8rem); display: flex;
+         flex-direction: column; gap: .5rem; }
+  .turn { display: grid; grid-template-columns: 1.6rem 1fr auto; gap: .6rem;
+          align-items: baseline; padding: .5rem .1rem; border-radius: .4rem;
+          animation: in .25s ease-out; }
+  @keyframes in { from { opacity: 0; transform: translateY(4px); } }
+  .turn .who { font-size: .95rem; text-align: center; }
+  .turn.user .what { color: var(--text); }
+  .turn.bot .what { color: var(--accent); }
+  .turn.tool .what { color: var(--dim); font-family: ui-monospace, Consolas, monospace;
+                     font-size: .82rem; word-break: break-word; }
+  .turn.note .what { color: var(--warn); font-size: .85rem; font-style: italic; }
+  .fal { font-variant-numeric: tabular-nums; font-size: .78rem; color: var(--dim);
+         white-space: nowrap; }
+  .fal.good { color: var(--accent); }
+  .fal.bad { color: var(--hot); }
+
+  .device { display: grid; grid-template-columns: 1.4rem 1fr auto; gap: .6rem;
+            align-items: center; padding: .55rem 0; border-top: 1px solid var(--line); }
+  .device:first-of-type { border-top: 0; }
+  .device .name { color: var(--dim); font-size: .88rem; }
+  .device .val { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .off { color: var(--dim); font-weight: 400; }
+  .bars { display: flex; gap: 2px; }
+  .bars i { width: .5rem; height: 1rem; border-radius: 1px; background: var(--line); }
+  .bars i.on { background: var(--accent); }
+
+  #stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem;
+           margin-bottom: .8rem; }
+  #stats div { text-align: center; }
+  #stats b { display: block; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+  #stats span { font-size: .68rem; text-transform: uppercase; letter-spacing: .07em;
+                color: var(--dim); }
+  #spark { display: flex; align-items: flex-end; gap: 2px; height: 2.5rem; }
+  #spark i { flex: 1; min-width: 3px; background: var(--accent); border-radius: 1px .5px 0 0;
+             opacity: .8; }
+  #spark i.bad { background: var(--hot); }
+  .target { font-size: .72rem; color: var(--dim); margin-top: .5rem; text-align: right; }
+  .empty { color: var(--dim); font-size: .88rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Voice Agent</h1>
+  <span class="sub">VinFast VF 8 · trợ lý ảo trên xe</span>
+  <span id="status"><span id="dot"></span><span id="statusText">đang kết nối…</span></span>
+  <button id="reset" title="Xoá hội thoại, đưa xe về mặc định">↺ Reset</button>
+</header>
+
+<section class="panel" id="logPanel">
+  <h2>Hội thoại</h2>
+  <div id="log"><p class="empty">Nói vào micro để bắt đầu.</p></div>
+</section>
+
+<aside style="display:grid; gap:1.25rem; align-content:start;">
+  <section class="panel">
+    <h2>Trạng thái xe</h2>
+    <div class="device">
+      <span>❄</span><span class="name">Điều hòa</span><span class="val" id="ac">—</span>
+    </div>
+    <div class="device">
+      <span>💨</span><span class="name">Quạt gió</span>
+      <span class="bars" id="fan"><i></i><i></i><i></i><i></i><i></i></span>
+    </div>
+    <div class="device">
+      <span>🪟</span><span class="name">Cửa sổ lái</span><span class="val" id="wd">—</span>
+    </div>
+    <div class="device">
+      <span>🪟</span><span class="name">Cửa sổ phụ</span><span class="val" id="wp">—</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>First Audio Latency</h2>
+    <div id="stats">
+      <div><b id="p50">—</b><span>p50</span></div>
+      <div><b id="p95">—</b><span>p95</span></div>
+      <div><b id="n">0</b><span>lượt</span></div>
+    </div>
+    <div id="spark"></div>
+    <p class="target">mục tiêu &lt; 2000 ms</p>
+  </section>
+</aside>
+
+<script>
+const $ = id => document.getElementById(id);
+const log = $("log"), samples = [];
+
+function row(cls, icon, text, fal) {
+  if (log.querySelector(".empty")) log.innerHTML = "";
+  const el = document.createElement("div");
+  el.className = "turn " + cls;
+  el.innerHTML = `<span class="who"></span><span class="what"></span><span class="fal"></span>`;
+  el.children[0].textContent = icon;
+  el.children[1].textContent = text;
+  if (fal != null) {
+    el.children[2].textContent = (fal / 1000).toFixed(2) + " s";
+    el.children[2].classList.add(fal < 2000 ? "good" : "bad");
+  }
+  log.append(el);
+  log.scrollTop = log.scrollHeight;
+  return el;
+}
+
+// The FAL of a turn arrives after the sentence it belongs to, so it is stamped onto
+// the last bot row rather than getting a row of its own.
+function stampFal(ms) {
+  samples.push(ms);
+  const rows = log.querySelectorAll(".turn.bot");
+  const target = rows[rows.length - 1];
+  if (target && !target.children[2].textContent) {
+    target.children[2].textContent = (ms / 1000).toFixed(2) + " s";
+    target.children[2].classList.add(ms < 2000 ? "good" : "bad");
+  }
+  const sorted = [...samples].sort((a, b) => a - b);
+  const q = p => sorted[Math.max(0, Math.ceil(sorted.length * p) - 1)];
+  $("p50").textContent = (q(.5) / 1000).toFixed(2) + "s";
+  $("p95").textContent = (q(.95) / 1000).toFixed(2) + "s";
+  $("n").textContent = samples.length;
+  const recent = samples.slice(-40), top = Math.max(3000, ...recent);
+  $("spark").innerHTML = recent
+    .map(v => `<i class="${v < 2000 ? "" : "bad"}" style="height:${(v / top * 100).toFixed(0)}%"></i>`)
+    .join("");
+}
+
+function setState(s) {
+  const ac = $("ac");
+  ac.textContent = s.ac.on ? `BẬT · ${s.ac.temp}°C` : "TẮT";
+  ac.classList.toggle("off", !s.ac.on);
+  [...$("fan").children].forEach((b, i) => b.classList.toggle("on", i < s.fan.level));
+  for (const [id, v] of [["wd", s.window.driver], ["wp", s.window.passenger]]) {
+    $(id).textContent = v ? v + "%" : "đóng";
+    $(id).classList.toggle("off", !v);
+  }
+}
+
+function setDot(cls, text) {
+  $("dot").className = cls;
+  $("statusText").textContent = text;
+}
+
+// Reset clears the vehicle, the agent's memory of the conversation, and this page.
+// The server owns all three; the page only asks.
+$("reset").onclick = async () => {
+  const b = $("reset");
+  b.disabled = true;
+  try { await fetch("/reset", { method: "POST" }); }
+  catch { setDot("", "reset thất bại"); }
+  b.disabled = false;
+};
+
+function clearLog() {
+  samples.length = 0;
+  log.innerHTML = '<p class="empty">Nói vào micro để bắt đầu.</p>';
+  $("p50").textContent = $("p95").textContent = "—";
+  $("n").textContent = "0";
+  $("spark").innerHTML = "";
+}
+
+const es = new EventSource("/events");
+es.onopen = () => setDot("live", "sẵn sàng");
+es.onerror = () => setDot("", "mất kết nối");
+es.onmessage = e => {
+  const d = JSON.parse(e.data);
+  if (d.kind === "state") setState(d);
+  else if (d.kind === "user") { setDot("live", "đang xử lý"); row("user", "🎤", d.text); }
+  else if (d.kind === "bot") { setDot("live", "sẵn sàng"); row("bot", "🔊", d.text); }
+  else if (d.kind === "tool") row("tool", "🔧", `${d.name}(${d.args}) → ${d.result}`);
+  else if (d.kind === "fal") stampFal(d.ms);
+  else if (d.kind === "listening") setDot("hear", "đang nghe");
+  else if (d.kind === "interrupted") row("note", "✋", "người dùng ngắt lời");
+  else if (d.kind === "reset") { clearLog(); setDot("live", "đã reset"); }
+};
+</script>
+</body>
+</html>

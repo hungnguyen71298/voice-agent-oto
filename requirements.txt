@@ -1,3 +1,12 @@
-pipecat-ai[silero,openai,local]
-rank-bm25
-python-dotenv
+pipecat-ai[silero,openai,local,piper]
+
+# Imported directly by this codebase, so declared here rather than inherited from
+# pipecat's dependency tree. tests/test_packaging.py enforces that this list stays complete.
+aiohttp          # dashboard SSE server
+av               # decodes Edge TTS mp3 to PCM
+edge-tts         # TTS_ENGINE=edge
+loguru           # logging, shared with pipecat
+piper-tts        # local Vietnamese TTS; scripts/e2e.py drives it directly
+pyaudio          # mic capture; voice_agent/audio.py opens the device itself
+python-dotenv    # .env loading
+rank-bm25        # knowledge base retrieval

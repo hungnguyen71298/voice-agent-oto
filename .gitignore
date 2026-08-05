@@ -11,3 +11,7 @@ dist/
 
 # graphify analysis output — a working artefact, not part of the deliverable
 graphify-out/
+
+# Piper voice models — downloaded on first run and baked into the Docker image.
+# ~121 MB of binaries that would bloat every clone.
+data/piper/

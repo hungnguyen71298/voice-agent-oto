@@ -4,15 +4,15 @@ Trợ lý ảo tương tác hoàn toàn bằng giọng nói: **điều khiển t
 **tra sổ tay hướng dẫn sử dụng**, **tìm thông tin Internet**.
 
 ```
-mic ─► SileroVAD ─► STT ─► LLM (+tool calling) ─► TTS ─► loa
-                    └──────── OpenRouter, 1 API key ────────┘
-                                   │
-                                   ▼
+mic ─► SileroVAD ─► STT ─► LLM (+tool calling) ─┬─► TTS (Piper, local) ─► loa
+                    └── OpenRouter, 1 key ──┘   │
+                                   │            └── lệnh điều khiển: đọc thẳng
+                                   ▼                câu xác nhận, bỏ vòng LLM thứ 2
                     tools/  vehicle mock · BM25 knowledge base · search
 ```
 
-Chi tiết: [`docs/kien-truc.md`](docs/kien-truc.md) · lý do từng lựa chọn:
-[`docs/quyet-dinh.md`](docs/quyet-dinh.md)
+[Cài đặt](docs/cai-dat.md) · [Kiến trúc](docs/kien-truc.md) ·
+[Quyết định kỹ thuật](docs/quyet-dinh.md) · [Kết quả đo](docs/ket-qua.md)
 
 ## Cài đặt
 
@@ -22,8 +22,9 @@ python -m venv .venv
 cp .env.example .env                               # điền OPENROUTER_API_KEY
 ```
 
-Lấy key: <https://openrouter.ai/keys>. Một key dùng cho cả STT, LLM và TTS.
-Nạp ~$25 là đủ cho toàn bộ quá trình phát triển và demo (xem [Chi phí](#chi-phí)).
+Lấy key: <https://openrouter.ai/keys>. Một key cho cả STT và LLM. **TTS chạy local**,
+không cần key thứ hai — lần chạy đầu tự tải model Piper (~60 MB) về `data/piper/`.
+Nạp ~$20 là đủ cho toàn bộ quá trình phát triển và demo (xem [Chi phí](#chi-phí)).
 
 ## Chạy
 
@@ -32,7 +33,19 @@ Nạp ~$25 là đủ cho toàn bộ quá trình phát triển và demo (xem [Chi
 ```
 
 Nói vào mic, agent trả lời bằng giọng nói. Mỗi lượt in ra transcript, tool được
-gọi, kết quả tool và **First Audio Latency**.
+gọi, kết quả tool và **First Audio Latency**. Nút **Reset** trên dashboard xoá hội
+thoại và đưa xe về mặc định mà không phải khởi động lại.
+
+Mở <http://127.0.0.1:8080> để xem **dashboard**: hội thoại trực tiếp, tool đang
+chạy, trạng thái xe và biểu đồ FAL từng lượt. Trang chỉ quan sát — mic vẫn ở máy
+chạy pipeline, không có chặng mạng nào thêm vào đường âm thanh nên số FAL không bị
+ảnh hưởng. Tắt bằng `UI_PORT=0`.
+
+Xem dashboard mà không cần mic (cũng là phương án dự phòng khi thuyết trình):
+
+```bash
+.venv/bin/python scripts/demo_ui.py
+```
 
 Windows: `$env:PYTHONIOENCODING="utf-8"` nếu console vỡ font tiếng Việt.
 
@@ -41,7 +54,7 @@ Windows: `$env:PYTHONIOENCODING="utf-8"` nếu console vỡ font tiếng Việt.
 Không cần API key, không cần mic:
 
 ```bash
-.venv/bin/python -m pytest        # 47 test
+.venv/bin/python -m pytest        # 88 test
 .venv/bin/python -m ruff check .  # lint
 ```
 
@@ -51,6 +64,9 @@ Không cần API key, không cần mic:
 | `tests/test_knowledge.py` | chunk mang heading, bigram tiếng Việt, retrieve đúng nội dung, không đụng state |
 | `tests/test_schema.py` | sinh JSON schema từ type hint + docstring |
 | `tests/test_metrics.py` | đo FAL đúng frame đầu tiên, bỏ lượt khi barge-in, probe không chặn frame |
+| `tests/test_vehicle.py` | câu xác nhận `speech` có mặt trên đường thành công, vắng mặt trên đường lỗi và trên tool tra cứu |
+| `tests/test_ui.py` | dashboard không nuốt frame, tab treo không chặn pipeline, mọi hình dạng kết quả tool đều đọc được |
+| `tests/test_packaging.py` | mọi thư viện được import đều có trong requirements — bắt lỗi "chạy máy tôi thì được" |
 
 ## Cấu hình
 
@@ -60,11 +76,17 @@ Mọi thứ đổi bằng biến môi trường, không sửa code:
 |---|---|---|
 | `OPENROUTER_API_KEY` | — | **bắt buộc** |
 | `TAVILY_API_KEY` | — | không có thì `search_internet` trả kết quả mock |
-| `STT_MODEL` | `openai/whisper-1` | |
-| `LLM_MODEL` | `google/gemini-3.1-flash-lite` | |
-| `TTS_MODEL` | `google/gemini-3.1-flash-tts-preview` | |
-| `TTS_VOICE` | `Kore` | |
+| `STT_MODEL` | `openai/whisper-large-v3` | |
+| `LLM_MODEL` | `google/gemini-3.5-flash-lite` | |
+| `TTS_ENGINE` | `piper` | `piper` (local) hoặc `edge` |
+| `PIPER_VOICE` | `vi_VN-vais1000-medium` | |
+| `EDGE_VOICE` | `vi-VN-HoaiMyNeural` | chỉ dùng khi `TTS_ENGINE=edge` |
 | `KB_TOP_K` | `3` | số chunk trả về mỗi lần tra sổ tay |
+| `INPUT_DEVICE` | mặc định hệ thống | index mic; xem [cài đặt](docs/cai-dat.md) |
+| `INPUT_RATE` | — | tần số thu gốc của mic, vd `44100` |
+| `STT_PROMPT` | từ vựng trong xe | mồi từ vựng cho Whisper |
+| `UI_PORT` | `8080` | `0` để tắt dashboard |
+| `UI_HOST` | `127.0.0.1` | Docker đặt `0.0.0.0` |
 
 ```bash
 LLM_MODEL=openai/gpt-5-mini .venv/bin/python -m voice_agent
@@ -93,15 +115,70 @@ FAL đo bởi `voice_agent/metrics.py` từ `UserStoppedSpeakingFrame` đến
 `TTSAudioRawFrame` đầu tiên — đúng định nghĩa mục 3 đề bài. Chưa trừ device
 output buffer (~20-40ms) nên số báo lạc quan hơn thực tế một chút.
 
-Đã đo (máy dev tại Việt Nam):
+`scripts/bench.py` đo phần mạng của chuỗi mà không cần mic: nó tự tổng hợp giọng
+"người dùng" bằng Edge TTS rồi nạp vào STT, nên chạy được ở mọi máy và đồng thời
+chấm luôn độ chính xác STT.
 
-| | cold | warm |
-|---|---|---|
-| HTTPS tới openrouter.ai | 375ms | ~176ms |
-| ICMP edge | | 44ms |
+```bash
+.venv/bin/python scripts/e2e.py --keep-audio out      # nguyên pipeline, không cần mic
+.venv/bin/python scripts/bench.py --repeat 3          # từng chặng mạng
+.venv/bin/python scripts/bench.py --voices            # xếp hạng giọng đọc
+```
 
-**Chưa đo end-to-end** — cần API key. Chạy `python -m voice_agent`, số in ra sau
-mỗi lượt, tổng kết p50/p95/max khi thoát.
+**End-to-end, nguyên pipeline** (`scripts/e2e.py`, 5 lượt hội thoại thật):
+**FAL p50 1016–1172 ms**, p95 2672–3203 ms, **5/5 lượt đạt**. Chi tiết:
+[`docs/ket-qua.md`](docs/ket-qua.md).
+
+Từng chặng riêng (`scripts/bench.py --repeat 3`, n=9):
+
+| | p50 | min | max |
+|---|---|---|---|
+| STT `openai/whisper-large-v3` | 703ms | 656 | 1235 |
+| LLM `gemini-3.5-flash-lite` → token đầu | 984ms | 782 | 3282 |
+| TTS `piper/vi_VN-vais1000-medium` | 93ms | 63 | 203 |
+| **Tổng** | **2297ms** | 1547 | 4078 |
+
+Độ chính xác STT: 85% (so từng từ với câu gốc).
+
+### Đã cắt được gì
+
+**Bỏ vòng LLM thứ hai cho lệnh điều khiển thiết bị.** Mỗi tool điều khiển trả kèm
+trường `speech` — câu xác nhận đã viết sẵn. Pipeline đọc thẳng câu đó và gọi
+`FunctionCallResultProperties(run_llm=False)`, thay vì gửi kết quả tool ngược lại
+cho model để nó diễn đạt. Câu nói vẫn được ghi vào ngữ cảnh
+(`TTSSpeakFrame(append_to_context=True)`) nên "tăng thêm hai độ nữa" ở lượt sau vẫn
+hiểu đúng. LLM p50 2517ms → 984ms.
+
+Đường lỗi và các tool tra cứu **không** có `speech`, vẫn đi qua model — vì đó mới là
+phần biết cách hỏi lại cho tự nhiên.
+
+**TTS chạy local.** Xem bảng đo trong `voice_agent/config.py`. Piper là lựa chọn duy
+nhất có đuôi latency bị chặn: không có mạng trên đường trả lời thì không bị bóp băng
+thông, không chết giữa đường vì nhà cung cấp.
+
+### Chọn giọng bằng số, không bằng cảm tính
+
+`--voices` cho mỗi giọng đọc một câu đã biết trước rồi đưa qua STT — cái gì còn
+sót lại là điểm. Không đo được độ tự nhiên, nhưng đo được **độ rõ**, và trong xe
+có tiếng ồn thì đó mới là thứ quyết định.
+
+| giọng | STT đọc lại đúng |
+|---|---|
+| `piper/vi_VN-vais1000-medium` | **79%** |
+| `edge/vi-VN-HoaiMyNeural` | 75% |
+| `piper/vi_VN-25hours_single-low` | 53% |
+
+Giọng Piper mặc định rõ hơn giọng Edge, dù nghe máy hơn. File nghe thử cả ba:
+[`data/samples/`](data/samples/).
+
+### Còn lại
+
+STT 703ms giờ là mảng lớn nhất, nhưng chạy local **không** giải quyết được:
+`faster-whisper small` trên CPU mất 2063ms — chậm gấp 3 lần gọi API. Đường CUDA
+báo thiếu `cublas64_12.dll` (cần cài CUDA 12 runtime + cuDNN, không có sẵn).
+Hướng còn lại là streaming ASR để STT chạy chồng lên lúc người dùng đang nói, thay
+vì đợi nói xong mới upload — OpenRouter `/audio/transcriptions` chỉ nhận file nên
+sẽ phải đổi nhà cung cấp cho nhánh này.
 
 ## Chi phí
 
@@ -109,12 +186,17 @@ mỗi lượt, tổng kết p50/p95/max khi thoát.
 
 | | Đơn giá | Tiền/lượt |
 |---|---|---|
-| STT | $0.016/phút | $0.0008 |
-| LLM in + out | $0.25 / $1.50 per 1M | $0.0009 |
-| TTS | $20/1M token audio | $0.0030 |
-| **Tổng** | | **~$0.005** |
+| STT `whisper-large-v3` | $0.006/phút | $0.0003 |
+| LLM in (~900 token: system prompt + 7 schema tool) | $0.30/1M | $0.0003 |
+| LLM out (~60 token) | $2.50/1M | $0.0002 |
+| TTS | chạy local | $0 |
+| **Tổng** | | **~$0.0008** |
 
-Toàn bộ quá trình phát triển + demo ≈ **$15-20**. Vận hành thật ≈ $3/tháng/xe.
+TTS local là phần cắt lớn nhất — qua API nó chiếm ~80% chi phí mỗi lượt.
+
+**Chi thật:** toàn bộ khảo sát model, benchmark và phát triển tính tới lúc này
+tốn **$0.042**. Cả quá trình làm bài + demo ước tính dưới **$3**. Vận hành thật
+≈ $0.5/tháng/xe với 20 lượt/ngày.
 
 ## Docker
 
@@ -135,6 +217,7 @@ Theo yêu cầu mục 9 đề bài:
 - **`search_internet`** — trả kết quả giả nếu không có `TAVILY_API_KEY`.
   Có key là tự chuyển sang gọi thật, không sửa code.
 - **Knowledge Base** — **không mock**, là sổ tay VF 8 thật.
+- **TTS** — **không mock**, Piper chạy thật trên máy.
 
 ## Cấu trúc
 
@@ -145,15 +228,25 @@ voice_agent/
 ├── app.py               lắp pipeline Pipecat
 ├── metrics.py           LatencyProbe — đo FAL
 ├── schema.py            hàm Python → JSON schema cho LLM
+├── tts.py               chọn engine TTS + EdgeTTSService
+├── audio.py             thu mic ở tần số gốc, tự hạ tần số
+├── ui.py                dashboard: event bus + UIProbe
+├── static/index.html    trang dashboard (1 file, không framework)
 └── tools/
     ├── __init__.py      registry + dispatch (không bao giờ raise)
     ├── vehicle.py       mock thiết bị trên xe
     ├── knowledge.py     BM25 trên sổ tay
     └── web.py           Tavily, mock nếu thiếu key
 data/kb/                 sổ tay VF 8 2026
+data/piper/              model giọng đọc, tự tải lần chạy đầu (gitignore)
+data/samples/            3 file nghe thử giọng
 scripts/fetch_kb.py      nạp KB từ om.vinfastauto.com
-tests/                   47 test, không cần API key
-docs/                    kiến trúc + lý do các quyết định
+scripts/bench.py         đo latency + xếp hạng giọng, không cần mic
+scripts/demo_ui.py       phát lại hội thoại mẫu vào dashboard, không cần mic
+scripts/e2e.py           chạy nguyên pipeline với giọng thu sẵn
+scripts/mic.py           tìm thiết bị mic thật sự nghe được
+tests/                   88 test, không cần API key
+docs/                    cài đặt · kiến trúc · quyết định · kết quả đo
 ```
 
 **Thêm tool = thêm 1 hàm** vào module trong `tools/` rồi đưa vào `TOOLS` của

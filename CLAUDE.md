@@ -8,7 +8,8 @@ Always use the venv interpreter — this machine has a second Python (Miniconda)
 and running bare `python` silently picks it up and fails on missing dependencies.
 
 ```bash
-.venv/Scripts/python -m pytest              # 47 tests, no API key, no mic needed
+.venv/Scripts/python -m pytest              # 88 tests, no API key, no mic needed
+.venv/Scripts/python scripts/e2e.py         # whole pipeline, recorded speech, needs the key
 .venv/Scripts/python -m ruff check .         # lint — config in pyproject.toml
 .venv/Scripts/python -m voice_agent         # run the agent (needs OPENROUTER_API_KEY)
 .venv/Scripts/python scripts/fetch_kb.py VF9 2026   # rebuild data/kb/
@@ -19,8 +20,12 @@ On Linux/macOS the paths are `.venv/bin/python` and `make check` (lint + test), 
 Windows: `$env:PYTHONIOENCODING="utf-8"` if the console garbles Vietnamese.
 `voice_agent/__main__.py` already calls `sys.stdout.reconfigure(encoding="utf-8")`.
 
-Models are swapped by env var, never by editing code: `STT_MODEL`, `LLM_MODEL`, `TTS_MODEL`,
-`TTS_VOICE`, `KB_TOP_K`. All three services route through one OpenRouter key.
+Models are swapped by env var, never by editing code: `STT_MODEL`, `LLM_MODEL`, `TTS_ENGINE`,
+`PIPER_VOICE`, `EDGE_VOICE`, `KB_TOP_K`. STT and LLM route through one OpenRouter key; TTS
+does not go through OpenRouter at all, because it serves no Vietnamese voice.
+
+`scripts/bench.py` measures the STT → LLM → TTS chain without a microphone, synthesising the
+test speech so any model combination can be compared by env var alone.
 
 ## Architecture
 

@@ -1,0 +1,19 @@
+# The build context is uploaded to the daemon before anything runs. Without this,
+# .venv alone is several GB and the build stalls before the first instruction.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.git/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Secrets never belong in an image layer. docker-compose passes .env at runtime.
+.env
+
+# Voice models are downloaded during the build, not copied from the host.
+data/piper/
+
+# Working artefacts, not part of the image.
+graphify-out/

@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Agent trên ô tô</title>
+<style>
+  :root {
+    --bg: #0b0e13; --panel: #141922; --line: #232a36;
+    --text: #e6ebf2; --dim: #8b97a8; --accent: #4dd4ac; --warn: #ffb454; --hot: #ff6b6b;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text); overflow: hidden;
+    font: 400 clamp(15px, 1.55vw, 21px)/1.55 ui-sans-serif, "Segoe UI", system-ui, sans-serif;
+  }
+  .slide {
+    display: none; height: 100vh; padding: 4.5vh 6vw 8vh;
+    flex-direction: column; justify-content: center; gap: .9em;
+    animation: in .18s ease-out;
+  }
+  .slide.on { display: flex; }
+  @keyframes in { from { opacity: 0; transform: translateY(6px); } }
+
+  h1 { font-size: 2.4em; line-height: 1.15; font-weight: 650; letter-spacing: -.02em; }
+  h2 { font-size: 1.5em; font-weight: 600; letter-spacing: -.01em; }
+  h2 .n { color: var(--dim); font-weight: 400; margin-right: .5em; font-size: .78em; }
+  p { color: var(--dim); max-width: 46em; }
+  strong { color: var(--text); font-weight: 600; }
+  em { color: var(--accent); font-style: normal; font-weight: 600; }
+  ul { list-style: none; display: flex; flex-direction: column; gap: .55em; max-width: 48em; }
+  li { padding-left: 1.35em; position: relative; color: var(--dim); }
+  li::before { content: "▸"; position: absolute; left: 0; color: var(--accent); }
+  li strong { color: var(--text); }
+
+  table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: .38em .95em; text-align: left; border-bottom: 1px solid var(--line); }
+  th { color: var(--dim); font-weight: 600; font-size: .8em; text-transform: uppercase;
+       letter-spacing: .06em; }
+  td.num { text-align: right; }
+  tr.win td { color: var(--accent); font-weight: 600; }
+  tr.bad td { color: var(--dim); }
+  td .tag { color: var(--hot); }
+
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: .5em;
+        padding: .9em 1.1em; overflow-x: auto; font-size: .82em; line-height: 1.5;
+        font-family: ui-monospace, Consolas, monospace; color: var(--dim); }
+  pre b { color: var(--accent); font-weight: 400; }
+  pre i { color: var(--warn); font-style: normal; }
+
+  .big { font-size: 4.2em; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+  .big small { font-size: .28em; color: var(--dim); font-weight: 400; letter-spacing: 0;
+               display: block; margin-top: .5em; }
+  .row { display: flex; gap: 3.5em; flex-wrap: wrap; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: .6em; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: .6em;
+          padding: 1em 1.2em; }
+  .card h3 { font-size: .78em; text-transform: uppercase; letter-spacing: .07em;
+             color: var(--dim); font-weight: 600; margin-bottom: .5em; }
+  .lede { color: var(--text); font-size: 1.12em; max-width: 40em; }
+  .note { color: var(--dim); font-size: .84em; }
+  .win { color: var(--accent); }
+  .hot { color: var(--hot); }
+
+  footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 1em 6vw;
+           display: flex; justify-content: space-between; align-items: center;
+           font-size: .74em; color: var(--dim); pointer-events: none; }
+  #bar { position: fixed; top: 0; left: 0; height: 2px; background: var(--accent);
+         transition: width .18s; }
+
+  @media print {
+    body { overflow: visible; }
+    .slide { display: flex !important; page-break-after: always; height: 100vh; }
+    footer, #bar { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<!-- 1 -->
+<section class="slide">
+  <p class="note">Bài tập tuyển dụng · trợ lý ảo trên ô tô</p>
+  <h1>Voice Agent trên ô tô</h1>
+  <p class="lede">Nói chuyện bằng giọng nói để điều khiển xe, tra sổ tay và hỏi thông tin.
+     Cascaded pipeline trên Pipecat, TTS chạy local.</p>
+  <div class="row" style="margin-top:1.5em">
+    <div><div class="big win">1.0<small>giây · FAL p50</small></div></div>
+    <div><div class="big">5/5<small>lượt e2e đạt</small></div></div>
+    <div><div class="big">$0.05<small>tổng chi phí đã tiêu</small></div></div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <h2><span class="n">01</span>Kiến trúc</h2>
+<pre>mic ─► SileroVAD ─► STT ─► LLM (+tool calling) ─┬─► <b>TTS (Piper, local)</b> ─► loa
+                    └── OpenRouter, 1 key ──┘   │
+                                   │            └── <i>lệnh điều khiển: đọc thẳng câu
+                                   ▼                xác nhận, bỏ vòng LLM thứ 2</i>
+             tools/  vehicle mock · BM25 sổ tay VF 8 · search</pre>
+  <ul>
+    <li><strong>Chỉ 2 lời gọi mạng</strong> mỗi lượt: STT và LLM. TTS, VAD, tool và
+        knowledge base đều chạy trên máy.</li>
+    <li><strong>Cascaded, không phải realtime API.</strong> Đề bài yêu cầu FAL &lt; 2s,
+        không yêu cầu realtime — và cascaded tính tiền theo lượt nói thật, không theo
+        thời gian mic mở.</li>
+    <li><strong>Đổi model bằng biến môi trường</strong>, không sửa code. Đã dùng đúng
+        khả năng này để chọn cả ba chặng.</li>
+  </ul>
+</section>
+
+<!-- 3 -->
+<section class="slide">
+  <h2><span class="n">02</span>First Audio Latency</h2>
+  <p class="lede">Từ lúc hệ thống xác định người dùng ngừng nói, đến frame âm thanh
+     đầu tiên phát ra loa.</p>
+  <div class="row">
+    <div><div class="big win">1016<small>ms · p50, lần chạy 1</small></div></div>
+    <div><div class="big win">1172<small>ms · p50, lần chạy 2</small></div></div>
+    <div><div class="big">2.7–3.2<small>giây · p95</small></div></div>
+  </div>
+  <ul>
+    <li>Đo bởi <strong>chính pipeline</strong>, đặt ngay trước transport output nên nó
+        thấy đúng frame sắp ra loa.</li>
+    <li>p95 là lượt tra sổ tay — lượt duy nhất còn phải qua <strong>hai vòng LLM</strong>,
+        vì kết quả tìm kiếm cần model tóm tắt.</li>
+    <li class="note">Chưa trừ device output buffer (~20–40 ms), nên số báo lạc quan hơn
+        thực tế chừng đó.</li>
+  </ul>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <h2><span class="n">03</span>Đo bằng cách nào</h2>
+  <p class="lede"><code>scripts/e2e.py</code> dựng <strong>chính pipeline của sản phẩm</strong>
+     — cùng VAD, cùng turn detection, cùng dispatch, cùng probe — chỉ thay mic và loa
+     bằng file.</p>
+  <ul>
+    <li>Audio bơm vào <strong>đúng tốc độ thật</strong>. Tua nhanh sẽ khiến VAD chốt hết
+        lượt sớm và cho ra con số không ai đạt được ngoài đời.</li>
+    <li>Giọng người dùng <strong>commit sẵn trong repo</strong> → mọi lần chạy giống hệt
+        nhau, không phụ thuộc dịch vụ nào.</li>
+    <li>Assert dựa trên <strong>sự kiện thật</strong> — tool nào chạy, agent nói gì —
+        không dựa vào trạng thái xe.</li>
+    <li>Exit code khác 0 nếu bất kỳ lượt nào hỏng → chạy được trước mỗi lần demo.</li>
+  </ul>
+  <pre>$ python scripts/e2e.py
+<b>5/5 lượt đạt</b>   FAL n=5  p50=1016ms  p95=2672ms</pre>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <h2><span class="n">04</span>Năm lượt, năm yêu cầu</h2>
+  <table>
+    <tr><th>người dùng nói</th><th>STT nghe</th><th>tool</th><th>agent trả lời</th></tr>
+    <tr><td>Bật điều hòa hai mươi tư độ</td><td>Bật điều hòa 24 độ.</td>
+        <td><code>set_ac</code></td><td>Đã bật điều hòa 24 độ</td></tr>
+    <tr><td>Giảm thêm hai độ nữa</td><td>Giảm thêm 2 độ nữa.</td>
+        <td><code>adjust_ac_temperature</code></td><td>Đã giảm còn 22 độ</td></tr>
+    <tr><td>Mở cửa sổ</td><td>Mở cửa sổ</td><td>—</td>
+        <td>Bạn muốn mở cửa sổ ghế lái hay ghế phụ?</td></tr>
+    <tr class="win"><td>Ghế lái</td><td class="tag">Ghê lãi</td>
+        <td><code>set_window</code></td><td>Đã mở cửa sổ ghế lái 100 phần trăm</td></tr>
+    <tr><td>Áp suất lốp bao nhiêu là đúng</td><td>Áp suất lốt bao nhiêu…</td>
+        <td><code>search_manual</code></td><td>Xem nhãn dán ở cột trụ cửa bên ghế lái…</td></tr>
+  </table>
+  <p>Lượt 4: STT nghe sai hẳn thành <span class="hot">"Ghê lãi"</span>, nhưng vì lượt trước
+     agent vừa hỏi "ghế lái hay ghế phụ", model vẫn suy ra đúng.
+     <em>Ngữ cảnh đa lượt che được lỗi STT.</em></p>
+</section>
+
+<!-- 6 -->
+<section class="slide">
+  <h2><span class="n">05</span>Chọn model bằng số đo, không bằng bảng giá</h2>
+  <div class="row">
+    <div class="col">
+      <h3 class="note">STT — audio 3 giây</h3>
+      <table>
+        <tr class="win"><td>whisper-large-v3</td><td class="num">0.70 s</td><td>ổn định</td></tr>
+        <tr><td>gpt-4o-mini-transcribe</td><td class="num">0.95 s</td><td>ổn định</td></tr>
+        <tr class="bad"><td>whisper-1</td><td class="num tag">1.6–5.7 s</td><td>vọt</td></tr>
+        <tr class="bad"><td>deepgram/nova-3</td><td class="num tag">1.0–5.1 s</td><td>vọt</td></tr>
+      </table>
+    </div>
+    <div class="col">
+      <h3 class="note">LLM — tới token đầu tiên</h3>
+      <table>
+        <tr class="win"><td>gemini-3.5-flash-lite</td><td class="num">0.99 s</td></tr>
+        <tr><td>gemini-3.1-flash-lite</td><td class="num">1.30 s</td></tr>
+        <tr><td>gemini-3.6-flash</td><td class="num">1.73 s</td></tr>
+        <tr class="bad"><td>gpt-5-mini</td><td class="num">2.98 s</td></tr>
+      </table>
+    </div>
+  </div>
+  <p>Chọn <strong>whisper-large-v3</strong> vì <em>đuôi ổn định</em>, không vì p50 thấp nhất.
+     Một lượt 5 giây phá trải nghiệm nhiều hơn là 20 lượt nhanh hơn 100 ms bù lại được.</p>
+</section>
+
+<!-- 7 -->
+<section class="slide">
+  <h2><span class="n">06</span>Phát hiện lớn nhất: TTS qua API là ngõ cụt</h2>
+  <p class="lede">Kế hoạch ban đầu: cả ba chặng qua một key OpenRouter. Gọi thử mới biết
+     <strong>OpenRouter không có giọng tiếng Việt nào.</strong></p>
+  <table>
+    <tr><th>phương án</th><th>TTFB</th><th></th></tr>
+    <tr class="win"><td>piper <code>vi_VN-vais1000-medium</code></td><td class="num">93 ms</td>
+        <td>local · không key · không giới hạn</td></tr>
+    <tr><td>edge-tts <code>vi-VN-HoaiMyNeural</code></td><td class="num">438 ms</td>
+        <td><span class="tag">3063 ms khi gọi liên tục</span></td></tr>
+    <tr class="bad"><td>gemini-2.5-flash-preview-tts</td><td class="num">3469 ms</td>
+        <td>trả cả khối, không stream</td></tr>
+    <tr class="bad"><td>gemini-3.1-flash-tts-preview</td><td class="num">10985 ms</td>
+        <td>trả cả khối, không stream</td></tr>
+    <tr class="bad"><td>OpenRouter <code>/audio/speech</code></td><td class="num tag">—</td>
+        <td>chỉ có 8 + 5 ngôn ngữ, không có <code>vi</code></td></tr>
+  </table>
+  <p>Kết cục: TTS chạy local — <em>nhanh hơn 4 lần, miễn phí</em>, và tự nhiên ăn luôn
+     điểm cộng "thiết kế edge" mục 8.</p>
+</section>
+
+<!-- 8 -->
+<section class="slide">
+  <h2><span class="n">07</span>Tối ưu: bỏ vòng LLM thứ hai</h2>
+  <p class="lede">Vòng đời chuẩn của một tool call là <strong>hai</strong> lời gọi LLM:
+     một để quyết định gọi tool, một để đọc kết quả và diễn đạt.</p>
+  <p>Với lệnh điều khiển, kết quả <code>{"temp": 22}</code> chỉ có <em>đúng một cách nói</em>.
+     Vòng thứ hai tốn nguyên một chặng mạng mà không thêm thông tin.</p>
+<pre>{"device": "ac", "status": "success", <b>"speech": "Đã giảm còn 22 độ"</b>, "temp": 22}
+
+app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
+         result_callback(result, FunctionCallResultProperties(<b>run_llm=False</b>))</pre>
+  <div class="row" style="align-items:center">
+    <div class="big"><span style="color:var(--dim)">2517</span> → <span class="win">984</span>
+      <small>ms · LLM p50</small></div>
+    <ul style="flex:1">
+      <li><code>append_to_context</code> giữ câu vừa nói trong lịch sử → lượt sau nói
+          "tăng thêm hai độ nữa" vẫn hiểu.</li>
+      <li>Đường lỗi và tool tra cứu <strong>cố ý không</strong> có <code>speech</code> —
+          chúng cần model diễn đạt. Ranh giới này có test giữ.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 9 -->
+<section class="slide">
+  <h2><span class="n">08</span>Thêm tool = thêm một hàm</h2>
+<pre>def set_ac(on: bool, temperature: int | None = None) -> dict:
+    """<b>Bật hoặc tắt điều hòa, có thể kèm đặt nhiệt độ.</b>   ← description của tool
+
+    Args:
+        on: True để bật, False để tắt điều hòa.       <b>← description của tham số</b>
+        temperature: Nhiệt độ mong muốn, 16-30 độ C.
+    """</pre>
+  <ul>
+    <li>Type hint → kiểu JSON schema. <code>int | None</code> → <code>integer</code> và
+        <strong>không</strong> bắt buộc.</li>
+    <li><code>tools/</code> là Python thuần, <strong>không import Pipecat</strong>.
+        Đổi framework chỉ phải viết lại <code>schema.py</code> + <code>app.py</code>.</li>
+    <li><code>dispatch()</code> <strong>không bao giờ raise</strong> — LLM gọi sai tên,
+        sai kiểu, thiếu tham số là chuyện thường; trả error dict để model tự sửa.</li>
+    <li>Mọi hàm <strong>validate xong mới mutate</strong>. Đây là lỗi đã xảy ra thật
+        (<code>set_ac</code> bật điều hòa rồi mới từ chối nhiệt độ) và có test riêng.</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section class="slide">
+  <h2><span class="n">09</span>Knowledge base: dữ liệu thật</h2>
+  <p class="lede">Sổ tay hướng dẫn sử dụng <strong>VinFast VF 8 (2026)</strong> — 12 chương,
+     530k ký tự, 850 chunk. Không mock.</p>
+  <ul>
+    <li>BM25 in-memory: index dựng 250 ms, query 3 ms, <strong>0 đồng, 0 lời gọi mạng</strong>.
+        Đề bài mục 2.4 cho phép.</li>
+    <li>Hai chỉnh riêng cho tiếng Việt: <strong>chunk mang theo heading gần nhất</strong>
+        (đoạn nói về sấy kính không chứa chữ "sấy kính" nào), và
+        <strong>token gồm bigram âm tiết</strong> (<code>áp_suất</code>).</li>
+    <li>Dữ liệu thật lộ ra lỗi mà dữ liệu bịa không bao giờ lộ — chuyển sang sổ tay thật
+        bắt được ngay hai lỗi retrieval.</li>
+    <li class="note">Trần đã biết: vocabulary mismatch. Đường nâng cấp đã khảo sát:
+        BM25 top-20 rồi rerank bằng <code>baai/bge-m3</code>, +100–200 ms chỉ trên nhánh KB.</li>
+  </ul>
+</section>
+
+<!-- 11 -->
+<section class="slide">
+  <h2><span class="n">10</span>Hai lỗi chỉ lộ khi chạy thật</h2>
+  <div class="row">
+    <div class="card col" style="flex:1">
+      <h3>VAD chưa từng được nối</h3>
+      <p><code>LocalAudioTransportParams(vad_analyzer=…)</code> được Pipecat 1.7
+         <strong>nhận im lặng rồi bỏ qua</strong> — trường đó đã chuyển sang
+         <code>VADProcessor</code> đứng riêng trong pipeline.</p>
+      <p>Code trông đúng, khởi động không cảnh báo gì, và pipeline
+         <span class="hot">câm hoàn toàn</span> — kể cả đường mic thật.</p>
+    </div>
+    <div class="card col" style="flex:1">
+      <h3>Transcript không tới dashboard</h3>
+      <p>User aggregator tiêu thụ <code>TranscriptionFrame</code>, nên probe đặt cuối
+         pipeline không bao giờ thấy nó.</p>
+      <p>Mà <strong>hiển thị transcript là yêu cầu bắt buộc</strong> mục 2 đề bài.</p>
+    </div>
+  </div>
+  <p class="lede">84 unit test xanh không bắt được lỗi nào trong hai lỗi này.
+     <em>Một lần chạy thật thì bắt được cả hai.</em></p>
+</section>
+
+<!-- 12 -->
+<section class="slide">
+  <h2><span class="n">11</span>Chi phí</h2>
+  <div class="row">
+    <table>
+      <tr><th></th><th>đơn giá</th><th>tiền/lượt</th></tr>
+      <tr><td>STT whisper-large-v3</td><td>$0.006/phút</td><td class="num">$0.0003</td></tr>
+      <tr><td>LLM vào (~900 token)</td><td>$0.30/1M</td><td class="num">$0.0003</td></tr>
+      <tr><td>LLM ra (~60 token)</td><td>$2.50/1M</td><td class="num">$0.0002</td></tr>
+      <tr class="win"><td>TTS</td><td>chạy local</td><td class="num">$0</td></tr>
+      <tr><td><strong>tổng</strong></td><td></td><td class="num"><strong>~$0.0008</strong></td></tr>
+    </table>
+    <div class="col">
+      <div class="big win">$0.05<small>đã tiêu thật cho toàn bộ khảo sát,
+        benchmark, phát triển và e2e</small></div>
+    </div>
+  </div>
+  <ul>
+    <li>Đơn giá lấy từ <code>usage.cost</code> OpenRouter trả về, <strong>không</strong>
+        lấy từ bảng giá.</li>
+    <li>Vận hành ước tính <strong>$0.5/tháng/xe</strong> với 20 lượt/ngày —
+        so với $15–40 nếu dùng realtime API, vì realtime tính tiền theo thời gian mic mở.</li>
+  </ul>
+</section>
+
+<!-- 13 -->
+<section class="slide">
+  <h2><span class="n">12</span>Đã làm và chưa làm</h2>
+  <div class="row">
+    <div class="col" style="flex:1">
+      <h3 class="note win">Đã có</h3>
+      <ul>
+        <li>Pipeline đầy đủ, FAL p50 <strong>~1.0 s</strong></li>
+        <li>Hội thoại đa lượt, hỏi lại khi thiếu thông tin</li>
+        <li>Sổ tay VF 8 thật + tool mở rộng bằng 1 hàm</li>
+        <li>Dashboard trực tiếp, một chiều nên không đụng vào FAL</li>
+        <li>Đánh giá tự động (mục 8), benchmark nhiều model (mục 8)</li>
+        <li>TTS chạy edge (mục 8), Docker build được</li>
+        <li>84 test + lint, không cần key hay mic</li>
+      </ul>
+    </div>
+    <div class="col" style="flex:1">
+      <h3 class="note">Chưa làm, và biết vì sao</h3>
+      <ul>
+        <li><strong>Barge-in</strong>: probe đã xử lý, chưa kiểm chứng bằng hội thoại thật</li>
+        <li><strong>Câu đệm</strong> ("để tôi xem nhé") che 2 vòng LLM của nhánh tra cứu</li>
+        <li><strong>Streaming ASR</strong> để STT chạy chồng lúc người dùng đang nói —
+            phải đổi nhà cung cấp, <code>/audio/transcriptions</code> chỉ nhận file</li>
+        <li><strong>Whisper local</strong>: đã thử, CPU 2063 ms — chậm gấp 3 lần gọi API</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 14 -->
+<section class="slide">
+  <h1>Demo</h1>
+  <pre>$ python -m voice_agent
+STT=openai/whisper-large-v3
+LLM=google/gemini-3.5-flash-lite
+TTS=piper/vi_VN-vais1000-medium
+KB=850 chunks
+<b>Dashboard: http://127.0.0.1:8080</b>
+
+Start speaking (Ctrl+C to quit)...</pre>
+  <ul>
+    <li>"Bật điều hòa hai mươi hai độ" → <span class="note">điều khiển thiết bị</span></li>
+    <li>"Giảm thêm hai độ nữa" → <span class="note">nhớ lượt trước</span></li>
+    <li>"Mở cửa sổ" → <span class="note">phải hỏi lại, không được đoán</span></li>
+    <li>"Áp suất lốp bao nhiêu là đúng" → <span class="note">tra sổ tay VF 8</span></li>
+  </ul>
+  <p class="note">Không có mic: <code>python scripts/e2e.py</code> ·
+     chỉ xem giao diện: <code>python scripts/demo_ui.py</code></p>
+</section>
+
+<footer>
+  <span>Voice Agent trên ô tô</span>
+  <span><b id="cur">1</b> / <span id="tot">14</span> &nbsp;·&nbsp; ← → để chuyển</span>
+</footer>
+
+<script>
+const slides = [...document.querySelectorAll(".slide")];
+let i = 0;
+document.getElementById("tot").textContent = slides.length;
+
+function show(n) {
+  i = Math.max(0, Math.min(slides.length - 1, n));
+  slides.forEach((s, k) => s.classList.toggle("on", k === i));
+  document.getElementById("cur").textContent = i + 1;
+  document.getElementById("bar").style.width = ((i + 1) / slides.length * 100) + "%";
+  location.hash = i + 1;
+}
+
+addEventListener("keydown", e => {
+  if (["ArrowRight", "ArrowDown", " ", "PageDown"].includes(e.key)) { e.preventDefault(); show(i + 1); }
+  else if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); show(i - 1); }
+  else if (e.key === "Home") show(0);
+  else if (e.key === "End") show(slides.length - 1);
+});
+addEventListener("click", e => { if (!e.target.closest("a")) show(i + 1); });
+
+show(parseInt(location.hash.slice(1)) - 1 || 0);
+</script>
+</body>
+</html>
