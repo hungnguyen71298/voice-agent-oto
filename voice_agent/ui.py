@@ -94,7 +94,11 @@ class UIProbe(FrameProcessor):
                 emit("bot", text=self._said.strip())
             self._said = ""
         elif isinstance(frame, InterruptionFrame):
-            emit("interrupted")
+            # Pipecat broadcasts one of these every time the user starts speaking, even
+            # into silence, to flush whatever is queued. Only a non-empty `_said` means
+            # the bot really was mid-sentence — that is the barge-in worth showing.
+            if self._said.strip():
+                emit("interrupted")
             self._said = ""
         await self.push_frame(frame, direction)
 

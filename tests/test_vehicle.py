@@ -128,6 +128,13 @@ def test_successful_control_returns_speech(name, args, must_contain):
     assert must_contain in result["speech"], result["speech"]
 
 
+def test_window_speech_follows_the_direction_of_the_change():
+    """"Đóng cửa sổ 50%" answered with "đã mở 50 phần trăm" sounds like a misheard command."""
+    set_window("driver", 100)
+    assert "đóng" in set_window("driver", 50)["speech"]
+    assert "mở" in set_window("driver", 80)["speech"]
+
+
 @pytest.mark.parametrize("name,args", [
     ("set_ac", {"on": True, "temperature": 99}),
     ("set_fan", {"level": 9}),

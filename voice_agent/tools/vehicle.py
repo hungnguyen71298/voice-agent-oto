@@ -95,10 +95,18 @@ def set_window(position: str, opening: int) -> dict:
     """
     if position not in STATE["window"]:
         return {"device": "window", "status": "error", "message": f"Không có cửa sổ '{position}'"}
+    before = STATE["window"][position]
     STATE["window"][position] = max(0, min(100, opening))
     where = "ghế lái" if position == "driver" else "ghế phụ"
     pct = STATE["window"][position]
-    said = f"Đã đóng cửa sổ {where}" if pct == 0 else f"Đã mở cửa sổ {where} {pct} phần trăm"
+    # Which verb depends on the direction, not the final value: going 100 → 50 is closing,
+    # and answering "đã mở 50 phần trăm" to "đóng cửa sổ 50%" sounds like a misheard command.
+    if pct == 0:
+        said = f"Đã đóng cửa sổ {where}"
+    elif pct < before:
+        said = f"Đã đóng cửa sổ {where} còn {pct} phần trăm"
+    else:
+        said = f"Đã mở cửa sổ {where} {pct} phần trăm"
     return {"device": "window", "position": position, "status": "success", "speech": said,
             **STATE["window"]}
 

@@ -170,6 +170,12 @@ def test_barge_in_drops_the_half_spoken_sentence():
     assert [e["kind"] for e in events] == ["interrupted"]
 
 
+def test_speaking_into_silence_is_not_reported_as_barge_in():
+    """Pipecat interrupts on every user turn start; only mid-sentence counts."""
+    events, _ = run(said("xong"), BotStoppedSpeakingFrame(), InterruptionFrame())
+    assert [e["kind"] for e in events] == ["bot"]
+
+
 def test_consecutive_replies_do_not_bleed_into_each_other():
     events, _ = run(said("một"), BotStoppedSpeakingFrame(),
                     said("hai"), BotStoppedSpeakingFrame())
