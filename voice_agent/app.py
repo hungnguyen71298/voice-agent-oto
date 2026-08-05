@@ -19,10 +19,11 @@ from pipecat.transcriptions.language import Language
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransportParams
 
-from . import config, tools, ui
+from . import audio, config, tools, ui
 from . import tts as tts_engine
 from .metrics import LatencyProbe
 from .schema import to_schema
+from .tools import vehicle
 from .tools.vehicle import describe_state
 
 
@@ -34,7 +35,8 @@ def transport_params() -> LocalAudioTransportParams:
     but the field is still accepted silently, so passing it looks correct and does
     nothing. `scripts/e2e.py` is what caught that.
     """
-    return LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True)
+    return LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True,
+                                     input_device_index=config.INPUT_DEVICE)
 
 
 def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, LatencyProbe]:
@@ -45,10 +47,14 @@ def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, La
             `scripts/e2e.py` passes a file-backed one so the whole pipeline can be
             exercised without anybody speaking.
     """
-    transport = transport or LocalAudioTransport(transport_params())
+    if transport is None:
+        params = transport_params()
+        transport = (audio.NativeRateAudioTransport(params, config.INPUT_RATE)
+                     if config.INPUT_RATE else LocalAudioTransport(params))
     stt = OpenAISTTService(
         api_key=config.OPENROUTER_KEY, base_url=config.OPENROUTER_BASE,
-        settings=OpenAISTTService.Settings(model=config.STT_MODEL, language=Language.VI))
+        settings=OpenAISTTService.Settings(model=config.STT_MODEL, language=Language.VI,
+                                           prompt=config.STT_PROMPT))
     llm = OpenAILLMService(
         api_key=config.OPENROUTER_KEY, base_url=config.OPENROUTER_BASE,
         settings=OpenAILLMService.Settings(model=config.LLM_MODEL))
@@ -75,10 +81,24 @@ def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, La
 
         llm.register_function(fn.__name__, handler)
 
-    ctx = LLMContext(
-        [{"role": "system", "content": config.SYSTEM_PROMPT.format(state=describe_state())}],
-        tools=[to_schema(f) for f in tools.ALL])
+    def system_prompt() -> list[dict]:
+        return [{"role": "system",
+                 "content": config.SYSTEM_PROMPT.format(state=describe_state())}]
+
+    ctx = LLMContext(system_prompt(), tools=[to_schema(f) for f in tools.ALL])
     agg = LLMContextAggregatorPair(ctx)
+
+    async def reset():
+        """Dashboard reset: forget the conversation and put the car back to defaults.
+
+        Order matters — the system prompt embeds the vehicle state, so rebuild it after
+        the reset or the agent starts out believing the old settings.
+        """
+        vehicle.reset_state()
+        ctx.set_messages(system_prompt())
+        print("  ↺ reset", flush=True)
+
+    ui.set_reset_handler(reset)
 
     def on_fal(ms: float):
         print(f"\n  ⏱  FAL {ms:.0f} ms\n", flush=True)
@@ -97,7 +117,12 @@ def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, La
         Pipeline([transport.input(), VADProcessor(vad_analyzer=SileroVADAnalyzer()),
                   stt, ui.UIProbe(), agg.user(), llm, tts, probe, ui.UIProbe(),
                   transport.output(), agg.assistant()]),
-        params=PipelineParams(enable_metrics=True, enable_usage_metrics=True))
+        params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
+        # Pipecat cancels the pipeline after 300s with no speech. Sensible for a phone
+        # bot paying for a call; wrong for a car, where the assistant has to still be
+        # listening after an hour of quiet driving. Observed as the agent simply exiting
+        # mid-demo with "CancelFrame (reason: idle timeout)".
+        cancel_on_idle_timeout=False)
     return task, probe
 
 

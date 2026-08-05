@@ -45,6 +45,25 @@ PIPER_CUDA = os.environ.get("PIPER_CUDA", "0") not in ("0", "false", "")
 EDGE_VOICE = os.environ.get("EDGE_VOICE", "vi-VN-HoaiMyNeural")  # or vi-VN-NamMinhNeural
 EDGE_RATE = os.environ.get("EDGE_RATE", "+0%")
 
+# Vocabulary hint for Whisper. It biases decoding toward words that actually occur in
+# this domain — without it "điều hòa" came back as "điện thoại" and "bật đi hoài" on a
+# real microphone, because those are far more common phrases in general Vietnamese.
+STT_PROMPT = os.environ.get("STT_PROMPT", (
+    "Trợ lý ảo trên ô tô VinFast VF 8. Các từ thường gặp: điều hòa, nhiệt độ, quạt gió, "
+    "mức quạt, cửa sổ, ghế lái, ghế phụ, mở, đóng, bật, tắt, tăng, giảm, độ C, "
+    "áp suất lốp, đèn cảnh báo, sấy kính, bảo hành, sổ tay, chế độ lái."))
+
+# Microphone. None uses the system default, which on Windows is often an MME device that
+# opens successfully and then delivers pure silence — no error, nothing in the log, the
+# agent simply never hears anything. `python scripts/mic.py` measures every input device
+# and prints the index to put here.
+INPUT_DEVICE = int(os.environ["INPUT_DEVICE"]) if os.environ.get("INPUT_DEVICE") else None
+# Rate to open the device at. Leave unset and the pipeline's 16 kHz is requested straight
+# from the driver, which is fine for a plain headset mic. Set it to the device's native
+# rate (44100 on the Realtek array tested here) when the driver's own downsampling is
+# mangling speech; `voice_agent/audio.py` then resamples with SoX instead.
+INPUT_RATE = int(os.environ["INPUT_RATE"]) if os.environ.get("INPUT_RATE") else None
+
 # Demo dashboard. 0 turns it off — the pipeline does not depend on it.
 UI_PORT = int(os.environ.get("UI_PORT", 8080))
 # Loopback by default: the page shows the driver's conversation, so it should not be

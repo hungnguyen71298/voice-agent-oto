@@ -55,7 +55,7 @@ file đó được commit.
 Không cần key, không cần mic, không gọi mạng:
 
 ```bash
-.venv/bin/python -m pytest        # 84 test
+.venv/bin/python -m pytest        # 88 test
 .venv/bin/python -m ruff check .
 ```
 
@@ -102,6 +102,9 @@ Thử vài câu:
 Chạy nguyên pipeline thật với giọng người dùng dựng sẵn, kiểm 5 hành vi và ghi lại
 âm thanh ra `out/`. Đây cũng là smoke test nên chạy trước mỗi lần demo.
 
+Dashboard có nút **Reset** ở góc trên phải: xoá hội thoại, xoá ngữ cảnh của agent và
+đưa xe về mặc định — khỏi phải khởi động lại giữa hai lần demo.
+
 Chỉ muốn xem giao diện thì:
 
 ```bash
@@ -135,15 +138,36 @@ $env:PYTHONIOENCODING="utf-8"
 ```
 `voice_agent/__main__.py` đã tự xử lý phần lớn trường hợp; biến này lo nốt các script lẻ.
 
-**`OSError` khi mở mic, hoặc không nghe thấy gì**
-Kiểm tra Windows/macOS đã cấp quyền micro cho terminal chưa. Liệt kê thiết bị:
+**Agent chạy nhưng không nghe thấy gì** *(trên Windows đây là lỗi hay gặp nhất)*
+
+Thiết bị mic **mặc định của Windows thường là MME, và nó mở stream thành công rồi trả
+im lặng hoàn toàn** — không lỗi, không log, agent trông như hỏng mà không có manh mối.
+Trên máy phát triển bài này, MME im lặng trong khi *cùng cái mic đó* qua DirectSound
+thu đỉnh gần hết thang.
+
 ```bash
-.venv/bin/python -c "import pyaudio; p=pyaudio.PyAudio(); [print(i, p.get_device_info_by_index(i)['name']) for i in range(p.get_device_count())]"
+.venv/bin/python scripts/mic.py
 ```
 
+Nói liên tục trong lúc nó chạy. Nó thu thử từng thiết bị, in mức đỉnh, rồi bảo bạn
+điền gì vào `.env`:
+
+```
+INPUT_DEVICE=6
+INPUT_RATE=44100
+```
+
+`INPUT_RATE` là tần số gốc của mic. Đặt nó để hệ thống tự hạ tần số bằng SoX thay vì
+để driver làm — driver hạ tần số kém đủ để đổi hẳn thứ Whisper nghe được ("điều hòa"
+thành "điện thoại").
+
+Nếu không thiết bị nào nghe thấy: kiểm tra mic có bị tắt tiếng, và Windows đã cho phép
+ứng dụng desktop dùng micro chưa (Settings → Privacy → Microphone).
+
 **Agent nghe sai từ**
-STT đạt ~85% từ đúng trên giọng tổng hợp. Nói chậm hơn và tắt bớt tiếng ồn. Đổi model
-mà không sửa code:
+Chạy `scripts/mic.py` trước — phần lớn trường hợp là do thiết bị hoặc tần số thu.
+Sau đó, `STT_PROMPT` mồi từ vựng trong xe cho Whisper (mặc định đã có: điều hòa, quạt
+gió, cửa sổ, ghế lái, áp suất lốp…); thêm từ của bạn vào nếu cần. Đổi model:
 ```bash
 STT_MODEL=openai/gpt-4o-mini-transcribe .venv/bin/python -m voice_agent
 ```

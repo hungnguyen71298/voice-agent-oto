@@ -33,7 +33,8 @@ Nạp ~$20 là đủ cho toàn bộ quá trình phát triển và demo (xem [Chi
 ```
 
 Nói vào mic, agent trả lời bằng giọng nói. Mỗi lượt in ra transcript, tool được
-gọi, kết quả tool và **First Audio Latency**.
+gọi, kết quả tool và **First Audio Latency**. Nút **Reset** trên dashboard xoá hội
+thoại và đưa xe về mặc định mà không phải khởi động lại.
 
 Mở <http://127.0.0.1:8080> để xem **dashboard**: hội thoại trực tiếp, tool đang
 chạy, trạng thái xe và biểu đồ FAL từng lượt. Trang chỉ quan sát — mic vẫn ở máy
@@ -53,7 +54,7 @@ Windows: `$env:PYTHONIOENCODING="utf-8"` nếu console vỡ font tiếng Việt.
 Không cần API key, không cần mic:
 
 ```bash
-.venv/bin/python -m pytest        # 84 test
+.venv/bin/python -m pytest        # 88 test
 .venv/bin/python -m ruff check .  # lint
 ```
 
@@ -81,6 +82,9 @@ Mọi thứ đổi bằng biến môi trường, không sửa code:
 | `PIPER_VOICE` | `vi_VN-vais1000-medium` | |
 | `EDGE_VOICE` | `vi-VN-HoaiMyNeural` | chỉ dùng khi `TTS_ENGINE=edge` |
 | `KB_TOP_K` | `3` | số chunk trả về mỗi lần tra sổ tay |
+| `INPUT_DEVICE` | mặc định hệ thống | index mic; xem [cài đặt](docs/cai-dat.md) |
+| `INPUT_RATE` | — | tần số thu gốc của mic, vd `44100` |
+| `STT_PROMPT` | từ vựng trong xe | mồi từ vựng cho Whisper |
 | `UI_PORT` | `8080` | `0` để tắt dashboard |
 | `UI_HOST` | `127.0.0.1` | Docker đặt `0.0.0.0` |
 
@@ -225,6 +229,7 @@ voice_agent/
 ├── metrics.py           LatencyProbe — đo FAL
 ├── schema.py            hàm Python → JSON schema cho LLM
 ├── tts.py               chọn engine TTS + EdgeTTSService
+├── audio.py             thu mic ở tần số gốc, tự hạ tần số
 ├── ui.py                dashboard: event bus + UIProbe
 ├── static/index.html    trang dashboard (1 file, không framework)
 └── tools/
@@ -239,7 +244,8 @@ scripts/fetch_kb.py      nạp KB từ om.vinfastauto.com
 scripts/bench.py         đo latency + xếp hạng giọng, không cần mic
 scripts/demo_ui.py       phát lại hội thoại mẫu vào dashboard, không cần mic
 scripts/e2e.py           chạy nguyên pipeline với giọng thu sẵn
-tests/                   84 test, không cần API key
+scripts/mic.py           tìm thiết bị mic thật sự nghe được
+tests/                   88 test, không cần API key
 docs/                    cài đặt · kiến trúc · quyết định · kết quả đo
 ```
 

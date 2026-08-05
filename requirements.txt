@@ -7,5 +7,6 @@ av               # decodes Edge TTS mp3 to PCM
 edge-tts         # TTS_ENGINE=edge
 loguru           # logging, shared with pipecat
 piper-tts        # local Vietnamese TTS; scripts/e2e.py drives it directly
+pyaudio          # mic capture; voice_agent/audio.py opens the device itself
 python-dotenv    # .env loading
 rank-bm25        # knowledge base retrieval

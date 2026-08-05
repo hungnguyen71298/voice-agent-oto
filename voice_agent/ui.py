@@ -31,6 +31,7 @@ from .tools.vehicle import STATE
 STATIC = config.ROOT / "voice_agent" / "static"
 
 _clients: list[asyncio.Queue] = []
+_on_reset = None  # set by app.py; the page cannot reach vehicle state or the LLM context
 _history: list[dict] = []
 _MAX_HISTORY = 60  # a browser opened mid-demo should see the conversation so far
 
@@ -38,7 +39,7 @@ _MAX_HISTORY = 60  # a browser opened mid-demo should see the conversation so fa
 def emit(kind: str, **data) -> None:
     """Broadcast one event to every open page. Safe to call when nobody is watching."""
     event = {"kind": kind, **data}
-    if kind != "state":  # state is a snapshot, replaying old ones would be noise
+    if kind not in ("state", "reset"):  # snapshots and one-shot signals are not history
         _history.append(event)
         del _history[:-_MAX_HISTORY]
     for q in _clients:
@@ -98,6 +99,26 @@ class UIProbe(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
+def set_reset_handler(handler) -> None:
+    """Register what the dashboard's reset button should do."""
+    global _on_reset
+    _on_reset = handler
+
+
+async def _reset(_request: web.Request) -> web.Response:
+    """Start the demo over: vehicle state, conversation history, and the page.
+
+    Resetting only the page would be worse than no button at all — the agent would
+    still remember the previous turns while the screen claimed a fresh start.
+    """
+    _history.clear()
+    if _on_reset:
+        await _on_reset()
+    emit("reset")
+    emit_state()
+    return web.json_response({"ok": True})
+
+
 async def _events(request: web.Request) -> web.StreamResponse:
     """SSE stream. One queue per connected page."""
     response = web.StreamResponse(headers={
@@ -125,7 +146,11 @@ async def start(port: int, host: str = "127.0.0.1") -> web.AppRunner | None:
         return None
     app = web.Application()
     app.router.add_get("/events", _events)
-    app.router.add_get("/", lambda _: web.FileResponse(STATIC / "index.html"))
+    app.router.add_post("/reset", _reset)
+    # No-cache: the page is edited during a demo and a stale copy from the browser
+    # cache looks exactly like a feature that was never added.
+    app.router.add_get("/", lambda _: web.FileResponse(
+        STATIC / "index.html", headers={"Cache-Control": "no-store"}))
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     await web.TCPSite(runner, host, port).start()

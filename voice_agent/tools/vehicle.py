@@ -10,13 +10,23 @@ those go back through the LLM, which is the part that knows how to ask a good
 follow-up question.
 """
 
+import copy
+
 # ponytail: state is an in-RAM dict, one vehicle, one process. Enough for the demo.
 # Upgrade path: adapter onto CAN bus / Android Automotive CarPropertyManager.
-STATE = {
+DEFAULTS = {
     "ac": {"on": False, "temp": 24},
     "fan": {"level": 0},
     "window": {"driver": 0, "passenger": 0},  # percent open
 }
+
+STATE = copy.deepcopy(DEFAULTS)
+
+
+def reset_state() -> None:
+    """Put the vehicle back to how it starts. Used by the dashboard's reset button."""
+    STATE.clear()
+    STATE.update(copy.deepcopy(DEFAULTS))
 
 
 def set_ac(on: bool, temperature: int | None = None) -> dict:

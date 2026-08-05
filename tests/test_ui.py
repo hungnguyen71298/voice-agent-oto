@@ -174,3 +174,51 @@ def test_consecutive_replies_do_not_bleed_into_each_other():
     events, _ = run(said("một"), BotStoppedSpeakingFrame(),
                     said("hai"), BotStoppedSpeakingFrame())
     assert [e["text"] for e in events if e["kind"] == "bot"] == ["một", "hai"]
+
+
+# --- reset ---------------------------------------------------------------------------
+# The button has to clear all three: the car, the agent's memory, and the page. Clearing
+# only the page is worse than no button — the screen would claim a fresh start while the
+# agent still remembered the previous turns.
+
+def test_reset_clears_history_and_announces_itself():
+    import asyncio as _asyncio
+
+    from voice_agent.tools import vehicle
+    q = _asyncio.Queue()
+    ui._clients.append(q)
+    ui.emit("user", text="cũ")
+    vehicle.set_ac(True, 30)
+
+    called = []
+    ui.set_reset_handler(lambda: called.append(True) or _asyncio.sleep(0))
+    _asyncio.run(ui._reset(None))
+
+    assert called, "the handler app.py installs must run"
+    assert ui._history == [], "old turns must not survive into a new demo"
+    kinds = [e["kind"] for e in drain(q)]
+    assert "reset" in kinds and "state" in kinds
+    ui.set_reset_handler(None)
+
+
+def test_reset_signal_is_not_replayed_to_late_joiners():
+    """A tab opened later must not be told to wipe itself."""
+    ui.emit("reset")
+    assert ui._history == []
+
+
+def test_vehicle_reset_restores_defaults():
+    from voice_agent.tools import vehicle
+    vehicle.set_ac(True, 30)
+    vehicle.set_fan(5)
+    vehicle.set_window("driver", 100)
+    vehicle.reset_state()
+    assert vehicle.STATE == vehicle.DEFAULTS
+
+
+def test_vehicle_reset_does_not_alias_the_defaults():
+    """A shallow copy would let the next command mutate DEFAULTS itself."""
+    from voice_agent.tools import vehicle
+    vehicle.reset_state()
+    vehicle.set_ac(True, 30)
+    assert vehicle.DEFAULTS["ac"] == {"on": False, "temp": 24}

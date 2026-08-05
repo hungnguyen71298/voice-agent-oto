@@ -24,6 +24,13 @@
   .sub { color: var(--dim); font-size: .82rem; }
   #status { margin-left: auto; display: flex; align-items: center; gap: .5rem;
             font-size: .82rem; color: var(--dim); }
+  #reset { margin-left: 1rem; background: var(--panel); color: var(--dim);
+           border: 1px solid var(--line); border-radius: .4rem; cursor: pointer;
+           padding: .35rem .8rem; font: inherit; font-size: .8rem;
+           transition: color .15s, border-color .15s; }
+  #reset:hover { color: var(--text); border-color: var(--dim); }
+  #reset:active { transform: translateY(1px); }
+  #reset:disabled { opacity: .45; cursor: default; }
   #dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--dim);
          transition: background .2s; }
   #dot.live { background: var(--accent); box-shadow: 0 0 0 4px rgba(77,212,172,.15); }
@@ -81,6 +88,7 @@
   <h1>Voice Agent</h1>
   <span class="sub">VinFast VF 8 · trợ lý ảo trên xe</span>
   <span id="status"><span id="dot"></span><span id="statusText">đang kết nối…</span></span>
+  <button id="reset" title="Xoá hội thoại, đưa xe về mặc định">↺ Reset</button>
 </header>
 
 <section class="panel" id="logPanel">
@@ -175,6 +183,24 @@ function setDot(cls, text) {
   $("statusText").textContent = text;
 }
 
+// Reset clears the vehicle, the agent's memory of the conversation, and this page.
+// The server owns all three; the page only asks.
+$("reset").onclick = async () => {
+  const b = $("reset");
+  b.disabled = true;
+  try { await fetch("/reset", { method: "POST" }); }
+  catch { setDot("", "reset thất bại"); }
+  b.disabled = false;
+};
+
+function clearLog() {
+  samples.length = 0;
+  log.innerHTML = '<p class="empty">Nói vào micro để bắt đầu.</p>';
+  $("p50").textContent = $("p95").textContent = "—";
+  $("n").textContent = "0";
+  $("spark").innerHTML = "";
+}
+
 const es = new EventSource("/events");
 es.onopen = () => setDot("live", "sẵn sàng");
 es.onerror = () => setDot("", "mất kết nối");
@@ -187,6 +213,7 @@ es.onmessage = e => {
   else if (d.kind === "fal") stampFal(d.ms);
   else if (d.kind === "listening") setDot("hear", "đang nghe");
   else if (d.kind === "interrupted") row("note", "✋", "người dùng ngắt lời");
+  else if (d.kind === "reset") { clearLog(); setDot("live", "đã reset"); }
 };
 </script>
 </body>
