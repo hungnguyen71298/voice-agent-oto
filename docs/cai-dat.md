@@ -55,7 +55,7 @@ file đó được commit.
 Không cần key, không cần mic, không gọi mạng:
 
 ```bash
-.venv/bin/python -m pytest        # 88 test
+.venv/bin/python -m pytest        # 99 test
 .venv/bin/python -m ruff check .
 ```
 

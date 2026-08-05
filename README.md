@@ -54,7 +54,7 @@ Windows: `$env:PYTHONIOENCODING="utf-8"` nếu console vỡ font tiếng Việt.
 Không cần API key, không cần mic:
 
 ```bash
-.venv/bin/python -m pytest        # 88 test
+.venv/bin/python -m pytest        # 99 test
 .venv/bin/python -m ruff check .  # lint
 ```
 
@@ -87,6 +87,8 @@ Mọi thứ đổi bằng biến môi trường, không sửa code:
 | `STT_PROMPT` | từ vựng trong xe | mồi từ vựng cho Whisper |
 | `UI_PORT` | `8080` | `0` để tắt dashboard |
 | `UI_HOST` | `127.0.0.1` | Docker đặt `0.0.0.0` |
+| `MAX_TURNS` | `200` | trần lượt mỗi phiên, `0` để tắt |
+| `MAX_TOKENS` | `500000` | trần token mỗi phiên, `0` để tắt |
 
 ```bash
 LLM_MODEL=openai/gpt-5-mini .venv/bin/python -m voice_agent
@@ -231,9 +233,10 @@ voice_agent/
 ├── tts.py               chọn engine TTS + EdgeTTSService
 ├── audio.py             thu mic ở tần số gốc, tự hạ tần số
 ├── ui.py                dashboard: event bus + UIProbe
+├── budget.py            trần chi phí LLM mỗi phiên
 ├── static/index.html    trang dashboard (1 file, không framework)
 └── tools/
-    ├── __init__.py      registry + dispatch (không bao giờ raise)
+    ├── __init__.py      registry + dispatch + bọc văn bản nguồn ngoài
     ├── vehicle.py       mock thiết bị trên xe
     ├── knowledge.py     BM25 trên sổ tay
     └── web.py           Tavily, mock nếu thiếu key
@@ -245,7 +248,7 @@ scripts/bench.py         đo latency + xếp hạng giọng, không cần mic
 scripts/demo_ui.py       phát lại hội thoại mẫu vào dashboard, không cần mic
 scripts/e2e.py           chạy nguyên pipeline với giọng thu sẵn
 scripts/mic.py           tìm thiết bị mic thật sự nghe được
-tests/                   88 test, không cần API key
+tests/                   99 test, không cần API key
 docs/                    cài đặt · kiến trúc · quyết định · kết quả đo
 ```
 

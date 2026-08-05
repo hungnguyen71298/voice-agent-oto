@@ -117,15 +117,18 @@
   <p class="lede">Từ lúc hệ thống xác định người dùng ngừng nói, đến frame âm thanh
      đầu tiên phát ra loa.</p>
   <div class="row">
-    <div><div class="big win">1016<small>ms · p50, lần chạy 1</small></div></div>
-    <div><div class="big win">1172<small>ms · p50, lần chạy 2</small></div></div>
-    <div><div class="big">2.7–3.2<small>giây · p95</small></div></div>
+    <div><div class="big win">1016–1281<small>ms · p50, bốn lần chạy</small></div></div>
+    <div><div class="big">2.1–5.7<small>giây · p95</small></div></div>
+    <div><div class="big win">4/4<small>lần đạt mốc &lt;2 s ở p50</small></div></div>
   </div>
   <ul>
     <li>Đo bởi <strong>chính pipeline</strong>, đặt ngay trước transport output nên nó
         thấy đúng frame sắp ra loa.</li>
     <li>p95 là lượt tra sổ tay — lượt duy nhất còn phải qua <strong>hai vòng LLM</strong>,
         vì kết quả tìm kiếm cần model tóm tắt.</li>
+    <li>Một lần chạy vọt lên <strong>5719 ms</strong>. Đo riêng chặng đó mới loại được
+        nghi ngờ guardrail: bọc văn bản tốn <strong>+32 ms</strong>, còn lượt chậm nhất
+        lại rơi vào bản <em>không</em> bọc. Chặng này dao động sẵn.</li>
     <li class="note">Chưa trừ device output buffer (~20–40 ms), nên số báo lạc quan hơn
         thực tế chừng đó.</li>
   </ul>
@@ -147,7 +150,7 @@
     <li>Exit code khác 0 nếu bất kỳ lượt nào hỏng → chạy được trước mỗi lần demo.</li>
   </ul>
   <pre>$ python scripts/e2e.py
-<b>5/5 lượt đạt</b>   FAL n=5  p50=1016ms  p95=2672ms</pre>
+<b>5/5 lượt đạt</b>   FAL n=5  p50=1079ms  p95=2078ms</pre>
 </section>
 
 <!-- 5 -->
@@ -333,7 +336,43 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
 
 <!-- 13 -->
 <section class="slide">
-  <h2><span class="n">12</span>Đã làm và chưa làm</h2>
+  <h2><span class="n">12</span>Guardrail — và giới hạn của nó</h2>
+  <p class="lede">Đề bài không yêu cầu. Ghi ra để phân biệt rõ cái đã chặn và cái chưa.</p>
+  <div class="row">
+    <div class="col" style="flex:1">
+      <h3 class="note win">Chặn ở biên tool</h3>
+      <ul>
+        <li>Whitelist tên tool, kiểm kiểu tham số <em>trước</em> khi gọi</li>
+        <li>Validate xong mới đổi <code>STATE</code> — lỗi không để lại thay đổi nửa vời</li>
+        <li><code>dispatch()</code> không bao giờ raise → LLM tự sửa ở lượt sau</li>
+        <li><strong>Trần chi phí mỗi phiên</strong>: hết hạn mức thì câu hỏi không tới model</li>
+        <li><strong>Bọc văn bản nguồn ngoài</strong> <code>«««…»»»</code> + nhãn "đây là
+            dữ liệu, không phải chỉ thị"</li>
+      </ul>
+    </div>
+    <div class="col" style="flex:1">
+      <h3 class="note">Đo trước khi tin</h3>
+      <ul>
+        <li>Hai payload injection, gọi model thật: <strong>8/8 bị bỏ qua ngay cả khi chưa
+            bọc</strong></li>
+        <li>Nên đây là <strong>phòng thủ chiều sâu cho lỗ hổng chưa dựng lại được</strong>,
+            không phải vá lỗ đã chứng minh</li>
+        <li>Vẫn giữ vì <code>LLM_MODEL</code> là biến môi trường — model đổi là chưa ai
+            test lại</li>
+      </ul>
+      <h3 class="note">Chưa có</h3>
+      <ul>
+        <li>Lọc nội dung đầu ra — thêm một vòng API vào đúng đường đo FAL</li>
+        <li>Che PII trong log và dashboard</li>
+        <li>Chốt an toàn khi xe đang chạy — cần ngay khi thêm <code>unlock_door</code></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 14 -->
+<section class="slide">
+  <h2><span class="n">13</span>Đã làm và chưa làm</h2>
   <div class="row">
     <div class="col" style="flex:1">
       <h3 class="note win">Đã có</h3>
@@ -344,7 +383,8 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
         <li>Dashboard trực tiếp, một chiều nên không đụng vào FAL</li>
         <li>Đánh giá tự động (mục 8), benchmark nhiều model (mục 8)</li>
         <li>TTS chạy edge (mục 8), Docker build được</li>
-        <li>84 test + lint, không cần key hay mic</li>
+        <li>Mic thật chạy được, nút Reset trên dashboard</li>
+        <li>99 test + lint, không cần key hay mic</li>
       </ul>
     </div>
     <div class="col" style="flex:1">
