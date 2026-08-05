@@ -1,3 +1,5 @@
-pipecat-ai[silero,openai,local]
+pipecat-ai[silero,openai,local,piper]
+aiohttp          # dashboard; also a pipecat dependency, pinned here because we import it
+edge-tts
 rank-bm25
 python-dotenv

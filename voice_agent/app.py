@@ -5,6 +5,7 @@
 import sys
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.frames.frames import FunctionCallResultProperties, TTSSpeakFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask
@@ -13,11 +14,11 @@ from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openai.stt import OpenAISTTService
-from pipecat.services.openai.tts import OpenAITTSService
 from pipecat.transcriptions.language import Language
 from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransportParams
 
-from . import config, tools
+from . import config, tools, ui
+from . import tts as tts_engine
 from .metrics import LatencyProbe
 from .schema import to_schema
 from .tools.vehicle import describe_state
@@ -27,18 +28,32 @@ def build_task() -> tuple[PipelineTask, LatencyProbe]:
     """Assemble the pipeline. Split out from `run()` so tests and benchmarks can reuse it."""
     transport = LocalAudioTransport(LocalAudioTransportParams(
         audio_in_enabled=True, audio_out_enabled=True, vad_analyzer=SileroVADAnalyzer()))
-    stt = OpenAISTTService(api_key=config.OPENROUTER_KEY, base_url=config.OPENROUTER_BASE,
-                           model=config.STT_MODEL, language=Language.VI)
-    llm = OpenAILLMService(api_key=config.OPENROUTER_KEY, base_url=config.OPENROUTER_BASE,
-                           model=config.LLM_MODEL)
-    tts = OpenAITTSService(api_key=config.OPENROUTER_KEY, base_url=config.OPENROUTER_BASE,
-                           model=config.TTS_MODEL, voice=config.TTS_VOICE)
+    stt = OpenAISTTService(
+        api_key=config.OPENROUTER_KEY, base_url=config.OPENROUTER_BASE,
+        settings=OpenAISTTService.Settings(model=config.STT_MODEL, language=Language.VI))
+    llm = OpenAILLMService(
+        api_key=config.OPENROUTER_KEY, base_url=config.OPENROUTER_BASE,
+        settings=OpenAILLMService.Settings(model=config.LLM_MODEL))
+    tts = tts_engine.build()
 
     for fn in tools.ALL:
         async def handler(params, _name=fn.__name__):
             result = tools.dispatch(_name, params.arguments)
             print(f"  🔧 {_name}({params.arguments}) → {result}", flush=True)
-            await params.result_callback(result)
+            ui.emit("tool", name=_name, args=str(dict(params.arguments)),
+                    result=ui.summarise(result))
+            ui.emit_state()
+            speech = result.get("speech")
+            if not speech:
+                await params.result_callback(result)  # let the LLM phrase the answer
+                return
+            # The tool already knows the whole answer, so the second LLM round trip buys
+            # nothing but latency. Speak the sentence and tell Pipecat not to re-run the
+            # model. `append_to_context` keeps the turn in history for follow-up questions
+            # like "tăng thêm hai độ nữa".
+            await params.llm.push_frame(TTSSpeakFrame(speech, append_to_context=True))
+            await params.result_callback(
+                result, properties=FunctionCallResultProperties(run_llm=False))
 
         llm.register_function(fn.__name__, handler)
 
@@ -46,10 +61,15 @@ def build_task() -> tuple[PipelineTask, LatencyProbe]:
         [{"role": "system", "content": config.SYSTEM_PROMPT.format(state=describe_state())}],
         tools=[to_schema(f) for f in tools.ALL])
     agg = LLMContextAggregatorPair(ctx)
-    probe = LatencyProbe(on_sample=lambda ms: print(f"\n  ⏱  FAL {ms:.0f} ms\n", flush=True))
+
+    def on_fal(ms: float):
+        print(f"\n  ⏱  FAL {ms:.0f} ms\n", flush=True)
+        ui.emit("fal", ms=round(ms))
+
+    probe = LatencyProbe(on_sample=on_fal)
 
     task = PipelineTask(
-        Pipeline([transport.input(), stt, agg.user(), llm, tts, probe,
+        Pipeline([transport.input(), stt, agg.user(), llm, tts, probe, ui.UIProbe(),
                   transport.output(), agg.assistant()]),
         params=PipelineParams(enable_metrics=True, enable_usage_metrics=True))
     return task, probe
@@ -60,12 +80,18 @@ async def run():
         sys.exit("Missing OPENROUTER_API_KEY — see .env.example")
 
     task, probe = build_task()
-    print(f"STT={config.STT_MODEL}\nLLM={config.LLM_MODEL}\nTTS={config.TTS_MODEL}\n"
-          f"KB={len(tools.knowledge.DOCS)} chunks\n\nStart speaking (Ctrl+C to quit)...",
-          flush=True)
+    runner = await ui.start(config.UI_PORT, config.UI_HOST)
+    voice = config.PIPER_VOICE if config.TTS_ENGINE == "piper" else config.EDGE_VOICE
+    dashboard = f"http://{config.UI_HOST}:{config.UI_PORT}" if runner else "off (UI_PORT=0)"
+    print(f"STT={config.STT_MODEL}\nLLM={config.LLM_MODEL}\n"
+          f"TTS={config.TTS_ENGINE}/{voice}\n"
+          f"KB={len(tools.knowledge.DOCS)} chunks\nDashboard: {dashboard}\n\n"
+          f"Start speaking (Ctrl+C to quit)...", flush=True)
     try:
         await PipelineRunner(handle_sigint=True).run(task)
     finally:
+        if runner:
+            await runner.cleanup()
         if s := probe.summary():
             print(f"\nFAL: n={s['n']}  p50={s['p50']:.0f}ms  p95={s['p95']:.0f}ms  "
                   f"max={s['max']:.0f}ms  discarded={s['discarded']}")

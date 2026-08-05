@@ -2,6 +2,12 @@
 
 Every function validates fully before mutating `STATE`, and returns a dict with a
 `status` field so the agent can read the execution result. Nothing here raises.
+
+A successful result also carries `speech`: the sentence to say back. The pipeline
+speaks it directly and skips the second LLM round trip, which measured 1.5-2.4s of
+the 4.1s a tool-using turn used to cost. Errors deliberately carry no `speech` —
+those go back through the LLM, which is the part that knows how to ask a good
+follow-up question.
 """
 
 # ponytail: state is an in-RAM dict, one vehicle, one process. Enough for the demo.
@@ -25,7 +31,8 @@ def set_ac(on: bool, temperature: int | None = None) -> dict:
     STATE["ac"]["on"] = on
     if temperature is not None:
         STATE["ac"]["temp"] = temperature
-    return {"device": "ac", "status": "success", **STATE["ac"]}
+    said = f"Đã bật điều hòa {STATE['ac']['temp']} độ" if on else "Đã tắt điều hòa"
+    return {"device": "ac", "status": "success", "speech": said, **STATE["ac"]}
 
 
 def adjust_ac_temperature(delta: int) -> dict:
@@ -34,7 +41,13 @@ def adjust_ac_temperature(delta: int) -> dict:
     Args:
         delta: Số độ thay đổi, dương là tăng, âm là giảm. Ví dụ -2 là giảm 2 độ.
     """
-    return set_ac(True, max(16, min(30, STATE["ac"]["temp"] + delta)))
+    before = STATE["ac"]["temp"]
+    result = set_ac(True, max(16, min(30, before + delta)))
+    if result["temp"] == before:  # already at the 16-30 limit; silence would read as a failure
+        result["speech"] = f"Điều hòa đã ở mức {before} độ rồi"
+    else:
+        result["speech"] = f"Đã {'giảm' if delta < 0 else 'tăng'} còn {result['temp']} độ"
+    return result
 
 
 def set_fan(level: int) -> dict:
@@ -46,7 +59,8 @@ def set_fan(level: int) -> dict:
     if not 0 <= level <= 5:
         return {"device": "fan", "status": "error", "message": "Mức quạt phải từ 0 đến 5"}
     STATE["fan"]["level"] = level
-    return {"device": "fan", "status": "success", **STATE["fan"]}
+    said = f"Đã đặt quạt mức {level}" if level else "Đã tắt quạt gió"
+    return {"device": "fan", "status": "success", "speech": said, **STATE["fan"]}
 
 
 def adjust_fan(delta: int) -> dict:
@@ -55,7 +69,11 @@ def adjust_fan(delta: int) -> dict:
     Args:
         delta: Số mức thay đổi, dương là tăng, âm là giảm. Ví dụ 2 là tăng hai mức.
     """
-    return set_fan(max(0, min(5, STATE["fan"]["level"] + delta)))
+    before = STATE["fan"]["level"]
+    result = set_fan(max(0, min(5, before + delta)))
+    if result["level"] == before:
+        result["speech"] = f"Quạt đã ở mức {before} rồi"
+    return result
 
 
 def set_window(position: str, opening: int) -> dict:
@@ -68,7 +86,11 @@ def set_window(position: str, opening: int) -> dict:
     if position not in STATE["window"]:
         return {"device": "window", "status": "error", "message": f"Không có cửa sổ '{position}'"}
     STATE["window"][position] = max(0, min(100, opening))
-    return {"device": "window", "position": position, "status": "success", **STATE["window"]}
+    where = "ghế lái" if position == "driver" else "ghế phụ"
+    pct = STATE["window"][position]
+    said = f"Đã đóng cửa sổ {where}" if pct == 0 else f"Đã mở cửa sổ {where} {pct} phần trăm"
+    return {"device": "window", "position": position, "status": "success", "speech": said,
+            **STATE["window"]}
 
 
 def describe_state() -> str:

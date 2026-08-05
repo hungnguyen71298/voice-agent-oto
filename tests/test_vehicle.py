@@ -105,3 +105,48 @@ def test_describe_state_is_readable():
     set_ac(True, 22)
     s = vehicle.describe_state()
     assert "bật" in s and "22" in s
+
+
+# --- the `speech` shortcut -----------------------------------------------------------
+# app.py speaks `speech` verbatim and suppresses the follow-up LLM call. That makes the
+# field load-bearing: a missing one silently costs a second round trip, and a wrong one
+# is read aloud to the driver as fact.
+
+@pytest.mark.parametrize("name,args,must_contain", [
+    ("set_ac", {"on": True, "temperature": 22}, "22"),
+    ("set_ac", {"on": False}, "tắt"),
+    ("set_fan", {"level": 3}, "3"),
+    ("set_fan", {"level": 0}, "tắt"),
+    ("set_window", {"position": "driver", "opening": 50}, "ghế lái"),
+    ("set_window", {"position": "passenger", "opening": 0}, "đóng"),
+    ("adjust_ac_temperature", {"delta": -2}, "22"),
+    ("adjust_fan", {"delta": 2}, "2"),
+])
+def test_successful_control_returns_speech(name, args, must_contain):
+    result = tools.dispatch(name, args)
+    assert result["status"] == "success"
+    assert must_contain in result["speech"], result["speech"]
+
+
+@pytest.mark.parametrize("name,args", [
+    ("set_ac", {"on": True, "temperature": 99}),
+    ("set_fan", {"level": 9}),
+    ("set_window", {"position": "rear", "opening": 50}),
+])
+def test_errors_carry_no_speech(name, args):
+    """Errors must reach the LLM — it is the part that can ask a sensible follow-up."""
+    assert "speech" not in tools.dispatch(name, args)
+
+
+@pytest.mark.parametrize("name", ["search_manual", "search_internet"])
+def test_lookup_tools_carry_no_speech(name):
+    """Their results need summarising, so they must not bypass the model."""
+    assert "speech" not in tools.dispatch(name, {"query": "áp suất lốp"})
+
+
+def test_speech_reports_a_no_op_rather_than_going_silent():
+    """At the clamp, nothing changes — saying so beats confirming a change that didn't happen."""
+    set_ac(True, 16)
+    assert "16" in vehicle.adjust_ac_temperature(-2)["speech"]
+    set_fan(5)
+    assert "5" in vehicle.adjust_fan(2)["speech"]

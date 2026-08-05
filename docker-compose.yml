@@ -2,11 +2,16 @@ services:
   voice-agent:
     build: .
     env_file: .env
+    ports:
+      - "8080:8080"
     # Mic and speaker need the host's audio devices. Linux hosts only; on Windows and
     # macOS Docker cannot forward audio, so run directly in a venv instead.
     devices:
       - /dev/snd:/dev/snd
     group_add:
       - audio
+    environment:
+      # 127.0.0.1 is unreachable from outside the container
+      UI_HOST: 0.0.0.0
     stdin_open: true
     tty: true

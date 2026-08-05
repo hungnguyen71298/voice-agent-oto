@@ -15,11 +15,41 @@ KB_DIR = pathlib.Path(os.environ.get("KB_DIR", ROOT / "data" / "kb"))
 OPENROUTER_BASE = os.environ.get("OPENROUTER_BASE", "https://openrouter.ai/api/v1")
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY")
 TAVILY_KEY = os.environ.get("TAVILY_API_KEY")
+# Defaults picked from measurement, not from the docs — see docs/quyet-dinh.md.
+# STT: 3s clip, 3 runs. whisper-large-v3 0.67-0.76s (stable); gpt-4o-mini-transcribe
+# 0.90-1.11s (6x cheaper); whisper-1 1.6-5.7s and nova-3 1.0-5.1s both spike badly.
+STT_MODEL = os.environ.get("STT_MODEL", "openai/whisper-large-v3")
+# LLM: streaming TTFT p50 over 3 runs. 3.5-flash-lite 985ms; 3.1-flash-lite 1297ms;
+# 3.6-flash 1734ms; gpt-5-mini 2984ms. TTFT is what FAL pays for, not total time.
+LLM_MODEL = os.environ.get("LLM_MODEL", "google/gemini-3.5-flash-lite")
+# TTS is the one leg that does not go through OpenRouter: it serves no Vietnamese voice at
+# all. /audio/speech accepts only hexgrad/kokoro-82m (en, ja, zh, es, fr, hi, it, pt) and
+# deepgram/aura-2 (en, fr, de, es, it). Measured TTFB for the alternatives:
+#
+#   piper vi_VN-vais1000-medium, CUDA     93 ms   local, no key, no rate limit
+#   piper vi_VN-vais1000-medium, CPU     140 ms
+#   edge-tts vi-VN-HoaiMyNeural          438 ms   but 3063 ms under back-to-back load,
+#                                                 and Microsoft starts refusing outright
+#   gemini-2.5-flash-preview-tts        3469 ms   returns the utterance in one blob
+#   gemini-3.1-flash-tts-preview       10985 ms   same, slower
+#
+# Piper is the default because it is the only one whose tail is bounded: no network on the
+# response path means no throttling and no provider outage mid-drive. Edge sounds better —
+# set TTS_ENGINE=edge to trade ~350 ms of FAL for it.
+TTS_ENGINE = os.environ.get("TTS_ENGINE", "piper")  # "piper" | "edge"
+PIPER_VOICE = os.environ.get("PIPER_VOICE", "vi_VN-vais1000-medium")
+PIPER_DIR = pathlib.Path(os.environ.get("PIPER_DIR", ROOT / "data" / "piper"))
+# Off by default: the CPU path already measures 93 ms, and asking for CUDA when the
+# installed onnxruntime has no GPU provider only prints a warning and falls back anyway.
+PIPER_CUDA = os.environ.get("PIPER_CUDA", "0") not in ("0", "false", "")
+EDGE_VOICE = os.environ.get("EDGE_VOICE", "vi-VN-HoaiMyNeural")  # or vi-VN-NamMinhNeural
+EDGE_RATE = os.environ.get("EDGE_RATE", "+0%")
 
-STT_MODEL = os.environ.get("STT_MODEL", "openai/whisper-1")
-LLM_MODEL = os.environ.get("LLM_MODEL", "google/gemini-3.1-flash-lite")
-TTS_MODEL = os.environ.get("TTS_MODEL", "google/gemini-3.1-flash-tts-preview")
-TTS_VOICE = os.environ.get("TTS_VOICE", "Kore")
+# Demo dashboard. 0 turns it off — the pipeline does not depend on it.
+UI_PORT = int(os.environ.get("UI_PORT", 8080))
+# Loopback by default: the page shows the driver's conversation, so it should not be
+# reachable from the network unless someone asks for that. Docker sets 0.0.0.0.
+UI_HOST = os.environ.get("UI_HOST", "127.0.0.1")
 
 KB_TOP_K = int(os.environ.get("KB_TOP_K", 3))
 MIN_CHUNK_CHARS = int(os.environ.get("MIN_CHUNK_CHARS", 150))
