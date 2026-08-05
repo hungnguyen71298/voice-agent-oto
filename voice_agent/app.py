@@ -91,14 +91,21 @@ def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, La
     async def reset():
         """Dashboard reset: forget the conversation and put the car back to defaults.
 
-        Order matters — the system prompt embeds the vehicle state, so rebuild it after
-        the reset or the agent starts out believing the old settings.
+        Flush first, because the button has to wait for the turn in flight rather than
+        race it. Observed live: pressed just after a tool call, it cleared the context
+        and *then* that turn's confirmation sentence was appended — leaving a history
+        that opened with the agent speaking and no question before it. The model read
+        that as unfinished work and re-ran the command on the next thing it heard.
+
+        Then order matters again — the system prompt embeds the vehicle state, so
+        rebuild it after resetting the car or the agent starts out believing the old
+        settings.
         """
+        if not await task.flush_pipeline():
+            print("  ↺ reset: pipeline did not drain in time", flush=True)
         vehicle.reset_state()
         ctx.set_messages(system_prompt())
         print("  ↺ reset", flush=True)
-
-    ui.set_reset_handler(reset)
 
     def on_fal(ms: float):
         print(f"\n  ⏱  FAL {ms:.0f} ms\n", flush=True)
@@ -115,7 +122,8 @@ def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, La
     # spoken text only exists after TTS. Each probe ignores the frames it never sees.
     money = budget.Budget(config.MAX_TURNS, config.MAX_TOKENS)
     task = PipelineTask(
-        Pipeline([transport.input(), VADProcessor(vad_analyzer=SileroVADAnalyzer()),
+        Pipeline([transport.input(), ui.MicGate(),
+                  VADProcessor(vad_analyzer=SileroVADAnalyzer()),
                   stt, ui.UIProbe(), agg.user(), budget.Gate(money), llm,
                   budget.Counter(money), tts, probe, ui.UIProbe(),
                   transport.output(), agg.assistant()]),
@@ -125,6 +133,9 @@ def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, La
         # listening after an hour of quiet driving. Observed as the agent simply exiting
         # mid-demo with "CancelFrame (reason: idle timeout)".
         cancel_on_idle_timeout=False)
+
+    # Registered here, not next to `reset`, because it closes over `task`.
+    ui.set_reset_handler(reset)
     return task, probe
 
 
