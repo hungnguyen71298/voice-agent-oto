@@ -32,6 +32,19 @@ Nạp ~$20 là đủ cho toàn bộ quá trình phát triển và demo (xem [Chi
 .venv/bin/python -m voice_agent
 ```
 
+**Windows: chạy `python scripts/mic.py` trước.** Thiết bị thu mặc định trên Windows
+thường là MME, và nó mở được bình thường rồi trả về **im lặng tuyệt đối** — không
+báo lỗi, không ghi log gì, agent trông như hỏng. Script này thu thử từng thiết bị và
+in mức âm lượng, rồi cho bạn biết cần đặt gì vào `.env`:
+
+```
+    INPUT_DEVICE=6
+    INPUT_RATE=44100
+```
+
+`INPUT_RATE` để hệ thống tự hạ tần số bằng SoX thay vì để driver làm — driver hạ tần
+số kém đủ để Whisper nghe sai hẳn từ. Chi tiết: [docs/cai-dat.md](docs/cai-dat.md).
+
 Nói vào mic, agent trả lời bằng giọng nói. Mỗi lượt in ra transcript, tool được
 gọi, kết quả tool và **First Audio Latency**. Nút **Reset** trên dashboard xoá hội
 thoại và đưa xe về mặc định mà không phải khởi động lại.
@@ -128,8 +141,11 @@ chấm luôn độ chính xác STT.
 .venv/bin/python scripts/bench.py --voices            # xếp hạng giọng đọc
 ```
 
-**End-to-end, nguyên pipeline** (`scripts/e2e.py`, 5 lượt hội thoại thật):
-**FAL p50 1016–1172 ms**, p95 2672–3203 ms, **5/5 lượt đạt**. Chi tiết:
+**End-to-end, nguyên pipeline** (`scripts/e2e.py`, 5 lượt hội thoại thật, 4 lần chạy):
+**FAL p50 1016–1281 ms** — đạt mốc <2 s cả 4 lần — p95 2078–5719 ms, **5/5 lượt đạt**.
+
+Đuôi p95 luôn là lượt tra sổ tay, lượt duy nhất còn phải qua hai vòng LLM. Nó dao động
+mạnh: một lần chạy ra 5719 ms. Cách loại trừ nguyên nhân và toàn bộ số đo:
 [`docs/ket-qua.md`](docs/ket-qua.md).
 
 Từng chặng riêng (`scripts/bench.py --repeat 3`, n=9):
