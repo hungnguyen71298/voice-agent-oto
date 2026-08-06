@@ -383,14 +383,16 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
         <li>Dashboard trực tiếp, một chiều nên không đụng vào FAL</li>
         <li>Đánh giá tự động (mục 8), benchmark nhiều model (mục 8)</li>
         <li>TTS chạy edge (mục 8), Docker build được</li>
-        <li>Mic thật chạy được, nút Reset trên dashboard</li>
-        <li>99 test + lint, không cần key hay mic</li>
+        <li>Mic thật chạy được, nút Reset và tắt Mic trên dashboard</li>
+        <li><strong>Barge-in</strong> (mục 8) — cắt lời agent giữa câu, đã thử bằng
+            hội thoại thật, lượt bị cắt được loại khỏi thống kê FAL</li>
+        <li>Guardrail: trần chi phí phiên, bọc văn bản nguồn ngoài</li>
+        <li>107 test + lint, không cần key hay mic</li>
       </ul>
     </div>
     <div class="col" style="flex:1">
       <h3 class="note">Chưa làm, và biết vì sao</h3>
       <ul>
-        <li><strong>Barge-in</strong>: probe đã xử lý, chưa kiểm chứng bằng hội thoại thật</li>
         <li><strong>Câu đệm</strong> ("để tôi xem nhé") che 2 vòng LLM của nhánh tra cứu</li>
         <li><strong>Streaming ASR</strong> để STT chạy chồng lúc người dùng đang nói —
             phải đổi nhà cung cấp, <code>/audio/transcriptions</code> chỉ nhận file</li>

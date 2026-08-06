@@ -91,18 +91,28 @@ def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, La
     async def reset():
         """Dashboard reset: forget the conversation and put the car back to defaults.
 
-        Flush first, because the button has to wait for the turn in flight rather than
-        race it. Observed live: pressed just after a tool call, it cleared the context
-        and *then* that turn's confirmation sentence was appended — leaving a history
-        that opened with the agent speaking and no question before it. The model read
-        that as unfinished work and re-ran the command on the next thing it heard.
+        Three steps, and the middle one is the whole reason this is not a one-liner.
 
-        Then order matters again — the system prompt embeds the vehicle state, so
+        Pressed just after a tool call, reset used to clear the context and *then* that
+        turn's confirmation sentence would land in the fresh context — leaving a history
+        that opened with the agent speaking and no question before it. The model read
+        that as unfinished work and re-ran the command on whatever it heard next.
+
+        Flushing is not enough on its own, which the live test proved: pipecat stamps the
+        frame that commits spoken text with a PTS and sends it through the transport's
+        *clock* queue, so it is timed to the audio rather than queued behind the flush
+        probe. The probe reaches the source and reports "drained" while that frame is
+        still waiting for its playback slot. Clearing the assistant aggregator's buffer
+        is what actually covers it — the commit frame then arrives to find nothing to
+        write, whichever side of this function it lands on.
+
+        Order matters at the end too: the system prompt embeds the vehicle state, so
         rebuild it after resetting the car or the agent starts out believing the old
         settings.
         """
         if not await task.flush_pipeline():
             print("  ↺ reset: pipeline did not drain in time", flush=True)
+        await agg.assistant().reset()
         vehicle.reset_state()
         ctx.set_messages(system_prompt())
         print("  ↺ reset", flush=True)
