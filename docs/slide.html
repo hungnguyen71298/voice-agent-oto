@@ -86,7 +86,7 @@
   <p class="lede">Nói chuyện bằng giọng nói để điều khiển xe, tra sổ tay và hỏi thông tin.
      Cascaded pipeline trên Pipecat, TTS chạy local.</p>
   <div class="row" style="margin-top:1.5em">
-    <div><div class="big win">1.0<small>giây · FAL p50</small></div></div>
+    <div><div class="big win">1.0–1.3<small>giây · FAL p50, 4 lần chạy</small></div></div>
     <div><div class="big">5/5<small>lượt e2e đạt</small></div></div>
     <div><div class="big">$0.05<small>tổng chi phí đã tiêu</small></div></div>
   </div>
@@ -99,7 +99,7 @@
                     └── OpenRouter, 1 key ──┘   │
                                    │            └── <i>lệnh điều khiển: đọc thẳng câu
                                    ▼                xác nhận, bỏ vòng LLM thứ 2</i>
-             tools/  vehicle mock · BM25 sổ tay VF 8 · search</pre>
+             tools/  vehicle mock · BM25 sổ tay VF 8 · search thật (Tavily)</pre>
   <ul>
     <li><strong>Chỉ 2 lời gọi mạng</strong> mỗi lượt: STT và LLM. TTS, VAD, tool và
         knowledge base đều chạy trên máy.</li>
@@ -129,6 +129,11 @@
     <li>Một lần chạy vọt lên <strong>5719 ms</strong>. Đo riêng chặng đó mới loại được
         nghi ngờ guardrail: bọc văn bản tốn <strong>+32 ms</strong>, còn lượt chậm nhất
         lại rơi vào bản <em>không</em> bọc. Chặng này dao động sẵn.</li>
+    <li>Nhánh tra Internet còn chậm hơn: <strong>4282 · 5312 · 6000 ms</strong> đo qua mic
+        thật, vì riêng Tavily đã tốn p50 <strong>1859 ms</strong>. Đây là chỗ câu đệm sẽ vá.</li>
+    <li class="note"><strong>Giới hạn của chính con số này:</strong> mỗi lần chạy chỉ 5 lượt,
+        nên "p95" ở đây thực chất là giá trị lớn nhất. Muốn có phân vị thật phải chạy 30 lượt
+        trở lên — tôi chưa làm.</li>
     <li class="note">Chưa trừ device output buffer (~20–40 ms), nên số báo lạc quan hơn
         thực tế chừng đó.</li>
   </ul>
@@ -305,7 +310,7 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
       <p>Mà <strong>hiển thị transcript là yêu cầu bắt buộc</strong> mục 2 đề bài.</p>
     </div>
   </div>
-  <p class="lede">84 unit test xanh không bắt được lỗi nào trong hai lỗi này.
+  <p class="lede">107 unit test xanh vẫn không bắt được lỗi nào trong hai lỗi này.
      <em>Một lần chạy thật thì bắt được cả hai.</em></p>
 </section>
 
@@ -329,8 +334,9 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
   <ul>
     <li>Đơn giá lấy từ <code>usage.cost</code> OpenRouter trả về, <strong>không</strong>
         lấy từ bảng giá.</li>
-    <li>Vận hành ước tính <strong>$0.5/tháng/xe</strong> với 20 lượt/ngày —
-        so với $15–40 nếu dùng realtime API, vì realtime tính tiền theo thời gian mic mở.</li>
+    <li><strong>Ước tính, không phải số đo:</strong> vận hành ~$0.5/tháng/xe với 20 lượt/ngày.
+        Con số so sánh với realtime API tôi bỏ đi — tôi chưa chạy realtime API lần nào nên
+        không có cơ sở.</li>
   </ul>
 </section>
 
@@ -377,7 +383,7 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
     <div class="col" style="flex:1">
       <h3 class="note win">Đã có</h3>
       <ul>
-        <li>Pipeline đầy đủ, FAL p50 <strong>~1.0 s</strong></li>
+        <li>Pipeline đầy đủ, FAL p50 <strong>1.0–1.3 s</strong> qua 4 lần chạy</li>
         <li>Hội thoại đa lượt, hỏi lại khi thiếu thông tin</li>
         <li>Sổ tay VF 8 thật + tool mở rộng bằng 1 hàm</li>
         <li>Dashboard trực tiếp, một chiều nên không đụng vào FAL</li>
@@ -393,7 +399,8 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
     <div class="col" style="flex:1">
       <h3 class="note">Chưa làm, và biết vì sao</h3>
       <ul>
-        <li><strong>Câu đệm</strong> ("để tôi xem nhé") che 2 vòng LLM của nhánh tra cứu</li>
+        <li><strong>Câu đệm</strong> ("để tôi xem nhé") che 2 vòng LLM của nhánh tra cứu —
+            nhánh Internet đang <strong>4.3–6.0 s</strong>, đây là điểm yếu lớn nhất còn lại</li>
         <li><strong>Streaming ASR</strong> để STT chạy chồng lúc người dùng đang nói —
             phải đổi nhà cung cấp, <code>/audio/transcriptions</code> chỉ nhận file</li>
         <li><strong>Whisper local</strong>: đã thử, CPU 2063 ms — chậm gấp 3 lần gọi API</li>
