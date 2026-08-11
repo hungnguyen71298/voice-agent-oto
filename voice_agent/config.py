@@ -69,11 +69,14 @@ STT_PROMPT = os.environ.get("STT_PROMPT", (
     "mức quạt, cửa sổ, ghế lái, ghế phụ, mở, đóng, bật, tắt, tăng, giảm, độ C, "
     "áp suất lốp, đèn cảnh báo, sấy kính, bảo hành, sổ tay, chế độ lái."))
 
-# Microphone. None uses the system default, which on Windows is often an MME device that
-# opens successfully and then delivers pure silence — no error, nothing in the log, the
-# agent simply never hears anything. `python scripts/mic.py` measures every input device
-# and prints the index to put here.
-INPUT_DEVICE = int(os.environ["INPUT_DEVICE"]) if os.environ.get("INPUT_DEVICE") else None
+# Microphone: a device index, or a case-insensitive substring of its name. Prefer the
+# name — PortAudio indices are assigned per boot, and the array that worked at 5 came
+# back as 6 after one restart, with `[Errno -9998]` from whatever inherited the index as
+# the only symptom. None uses the system default, which on Windows is often an MME device
+# that opens successfully and then delivers pure silence — no error, nothing in the log,
+# the agent simply never hears anything. `python scripts/mic.py` measures every input
+# device and prints what to put here.
+INPUT_DEVICE = os.environ.get("INPUT_DEVICE") or None
 # Rate to open the device at. Leave unset and the pipeline's 16 kHz is requested straight
 # from the driver, which is fine for a plain headset mic. Set it to the device's native
 # rate (44100 on the Realtek array tested here) when the driver's own downsampling is

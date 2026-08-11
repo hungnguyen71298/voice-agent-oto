@@ -8,7 +8,8 @@ delivers pure silence — the agent hears nothing, logs nothing, and looks broke
 visible reason. That happened on the machine this was developed on: the MME default was
 silent while the same microphone through DirectSound peaked at full scale.
 
-Put the winning index in `.env` as `INPUT_DEVICE`. If that device's native rate is not
+Put the winning *name* in `.env` as `INPUT_DEVICE` — indices are handed out per boot and
+the array that worked at 5 came back as 6 after a restart. If the winning rate is not
 16000, set `INPUT_RATE` to it as well — letting the driver downsample a 44.1 kHz array
 to 16 kHz degraded speech enough to change what Whisper transcribed.
 """
@@ -21,6 +22,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 sys.stdout.reconfigure(encoding="utf-8")
 
 import pyaudio  # noqa: E402
+
+from voice_agent import audio  # noqa: E402
 
 SECONDS = 3.0
 SPEECH = 3000  # peak amplitude that means "someone spoke", not "the room hums"
@@ -66,7 +69,7 @@ def main() -> int:
             bar = "#" * min(30, peak // 500)
             print(f"  {label}  đỉnh {peak:6}  {bar}"
                   + ("  ← nghe rõ" if peak >= SPEECH else ""))
-            results.append((peak, index, rate, native))
+            results.append((peak, index, rate, info["name"]))
 
     heard = [r for r in results if r[0] >= SPEECH]
     print()
@@ -75,13 +78,21 @@ def main() -> int:
         print("và Windows đã cho phép ứng dụng desktop dùng micro chưa.")
         return 1
 
-    peak, index, rate, native = max(heard)
-    print(f"Dùng thiết bị [{index}] (đỉnh {peak}). Thêm vào .env:\n")
-    print(f"    INPUT_DEVICE={index}")
-    if native != 16000:
-        print(f"    INPUT_RATE={native}")
+    peak, index, rate, name = max(heard)
+    # Name over index: indices are per-boot. But the same microphone shows up once per
+    # host API with near-identical names, so only recommend the name when it resolves
+    # back to the device actually measured.
+    devices = audio.list_devices(pa)
+    by_name = name if audio.match_device(name, devices) == index else None
+    print(f"Dùng thiết bị [{index}] {name} (đỉnh {peak} ở {rate} Hz). Thêm vào .env:\n")
+    print(f"    INPUT_DEVICE={by_name or index}")
+    if rate != 16000:
+        print(f"    INPUT_RATE={rate}")
         print("\nINPUT_RATE để hệ thống tự hạ tần số bằng SoX thay vì để driver làm —")
         print("driver hạ tần số kém có thể làm STT nghe sai hẳn từ.")
+    if by_name is None:
+        print("\nTên này trùng với thiết bị khác (cùng mic, khác host API) nên phải dùng"
+              "\nsố. Số đổi sau mỗi lần khởi động — chạy lại script nếu agent hoá điếc.")
     return 0
 
 

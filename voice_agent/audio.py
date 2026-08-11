@@ -24,6 +24,45 @@ from pipecat.transports.local.audio import (
 )
 
 
+def match_device(spec: str, devices) -> int | None:
+    """First device whose name contains `spec`, ignoring case and output-only devices.
+
+    Args:
+        spec: substring of the device name.
+        devices: `(index, name, max_input_channels)` triples.
+    """
+    spec = spec.lower()
+    return next((i for i, name, channels in devices
+                 if channels and spec in name.lower()), None)
+
+
+def list_devices(py_audio) -> list[tuple[int, str, int]]:
+    """`(index, name, max_input_channels)` for everything PortAudio can see."""
+    infos = (py_audio.get_device_info_by_index(i)
+             for i in range(py_audio.get_device_count()))
+    return [(int(d["index"]), d["name"], int(d["maxInputChannels"])) for d in infos]
+
+
+def resolve_device(spec: str | None) -> int | None:
+    """`config.INPUT_DEVICE` → a PortAudio index. None means the system default.
+
+    Names are resolved at startup rather than baked into `.env` as an index, because
+    the index moves between boots and the failure is silent-ish: PortAudio reports
+    `Invalid number of channels` for the speaker that took the number over.
+    """
+    if spec is None or (spec := str(spec).strip()).isdigit():
+        return int(spec) if spec else None
+    py_audio = pyaudio.PyAudio()
+    try:
+        index = match_device(spec, list_devices(py_audio))
+    finally:
+        py_audio.terminate()
+    if index is None:
+        raise SystemExit(f"INPUT_DEVICE={spec!r} matches no input device.\n"
+                         "  python scripts/mic.py   lists every device and its level")
+    return index
+
+
 class NativeRateAudioInput(LocalAudioInputTransport):
     """Capture at `capture_rate`, hand the pipeline `audio_in_sample_rate`."""
 

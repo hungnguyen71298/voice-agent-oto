@@ -38,12 +38,18 @@ báo lỗi, không ghi log gì, agent trông như hỏng. Script này thu thử 
 in mức âm lượng, rồi cho bạn biết cần đặt gì vào `.env`:
 
 ```
-    INPUT_DEVICE=6
+    INPUT_DEVICE=Primary Sound Capture Driver
     INPUT_RATE=44100
 ```
 
+`INPUT_DEVICE` nhận tên thiết bị (khớp một phần, không phân biệt hoa thường) hoặc số
+index. **Dùng tên**: index do PortAudio phát lại sau mỗi lần khởi động máy, mic đang ở
+5 sang hôm sau thành 6, và cái chiếm mất số 5 là loa nên agent chết với
+`[Errno -9998] Invalid number of channels`.
+
 `INPUT_RATE` để hệ thống tự hạ tần số bằng SoX thay vì để driver làm — driver hạ tần
-số kém đủ để Whisper nghe sai hẳn từ. Chi tiết: [docs/cai-dat.md](docs/cai-dat.md).
+số kém đủ để Whisper nghe sai hẳn từ. Chỉ đặt khi `mic.py` bảo đặt. Chi tiết:
+[docs/cai-dat.md](docs/cai-dat.md).
 
 Nói vào mic, agent trả lời bằng giọng nói. Mỗi lượt in ra transcript, tool được
 gọi, kết quả tool và **First Audio Latency**. Nút **Reset** trên dashboard xoá hội
@@ -96,7 +102,7 @@ Mọi thứ đổi bằng biến môi trường, không sửa code:
 | `PIPER_VOICE` | `vi_VN-vais1000-medium` | |
 | `EDGE_VOICE` | `vi-VN-HoaiMyNeural` | chỉ dùng khi `TTS_ENGINE=edge` |
 | `KB_TOP_K` | `3` | số chunk trả về mỗi lần tra sổ tay |
-| `INPUT_DEVICE` | mặc định hệ thống | index mic; xem [cài đặt](docs/cai-dat.md) |
+| `INPUT_DEVICE` | mặc định hệ thống | tên mic (nên dùng) hoặc index; xem [cài đặt](docs/cai-dat.md) |
 | `INPUT_RATE` | — | tần số thu gốc của mic, vd `44100` |
 | `STT_PROMPT` | từ vựng trong xe | mồi từ vựng cho Whisper |
 | `UI_PORT` | `8080` | `0` để tắt dashboard |

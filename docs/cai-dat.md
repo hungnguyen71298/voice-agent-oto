@@ -153,16 +153,32 @@ Nói liên tục trong lúc nó chạy. Nó thu thử từng thiết bị, in m�
 điền gì vào `.env`:
 
 ```
-INPUT_DEVICE=6
+INPUT_DEVICE=Primary Sound Capture Driver
 INPUT_RATE=44100
 ```
 
 `INPUT_RATE` là tần số gốc của mic. Đặt nó để hệ thống tự hạ tần số bằng SoX thay vì
 để driver làm — driver hạ tần số kém đủ để đổi hẳn thứ Whisper nghe được ("điều hòa"
-thành "điện thoại").
+thành "điện thoại"). Script chỉ in dòng này khi tần số thắng khác 16000; không in thì
+đừng đặt.
 
 Nếu không thiết bị nào nghe thấy: kiểm tra mic có bị tắt tiếng, và Windows đã cho phép
 ứng dụng desktop dùng micro chưa (Settings → Privacy → Microphone).
+
+**Agent chết ngay lúc mở mic: `[Errno -9998] Invalid number of channels`**
+
+`INPUT_DEVICE` đang trỏ vào một index không còn là mic nữa. PortAudio đánh số lại
+thiết bị sau mỗi lần khởi động máy — mic ở index 5 hôm nay, mai thành 6, và số 5 rơi
+vào cái loa. Vì thế `INPUT_DEVICE` nhận cả **tên** thiết bị (khớp một phần, không phân
+biệt hoa thường) và tên thì không đổi:
+
+```
+INPUT_DEVICE=Primary Sound Capture Driver
+```
+
+Tên chỉ được xét trên các thiết bị có ngõ vào, nên nó không bao giờ khớp nhầm sang
+loa cùng tên. Nếu cùng một mic hiện lên nhiều host API với tên giống hệt nhau,
+`mic.py` phát hiện được và quay lại khuyên dùng index.
 
 **Agent nghe sai từ**
 Chạy `scripts/mic.py` trước — phần lớn trường hợp là do thiết bị hoặc tần số thu.

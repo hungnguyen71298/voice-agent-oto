@@ -35,8 +35,9 @@ def transport_params() -> LocalAudioTransportParams:
     but the field is still accepted silently, so passing it looks correct and does
     nothing. `scripts/e2e.py` is what caught that.
     """
-    return LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True,
-                                     input_device_index=config.INPUT_DEVICE)
+    return LocalAudioTransportParams(
+        audio_in_enabled=True, audio_out_enabled=True,
+        input_device_index=audio.resolve_device(config.INPUT_DEVICE))
 
 
 def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, LatencyProbe]:
