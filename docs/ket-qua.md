@@ -274,6 +274,16 @@ mạng mà không thêm thông tin. Bỏ nó đi: LLM p50 2517 ms → 984 ms.
 trông đúng, khởi động không báo gì, và pipeline câm hoàn toàn. Chỉ có lần chạy e2e thật
 mới lộ ra. Đây là lý do một bài kiểm thử đơn vị xanh không thay được một lần chạy thật.
 
+**Index thiết bị âm thanh không bền qua một lần khởi động máy.** `.env` giữ
+`INPUT_DEVICE=5`, chạy được 14 lượt, hôm sau bật lại thì chết ngay lúc mở mic:
+`[Errno -9998] Invalid number of channels`. PortAudio đánh số lại sau mỗi lần boot —
+mic sang 6, và số 5 rơi vào một cái loa. Thông báo lỗi không hề nhắc tới thiết bị nào,
+nên nó trông như lỗi driver. `INPUT_DEVICE` giờ nhận cả tên thiết bị và chỉ dò trong
+các thiết bị có ngõ vào. Cùng lúc lộ ra `scripts/mic.py` khuyên sai: nó in tần số
+*gốc* của thiết bị thay vì tần số nó vừa đo được, nên bảo đặt `INPUT_RATE=44100` cho
+một thiết bị chỉ đo được đỉnh 727 ở 44100 và 32767 ở 16000. Một script chẩn đoán tự
+mâu thuẫn với số đo của chính nó thì tệ hơn là không có script.
+
 **Sáu lỗi đóng gói chỉ lộ khi build Docker.** `pyaudio` không có wheel Linux nên phải
 biên dịch; `av` và `loguru` được import trực tiếp nhưng chỉ có mặt nhờ dependency của
 Pipecat. `tests/test_packaging.py` giờ quét AST toàn bộ source và chặn loại lỗi này

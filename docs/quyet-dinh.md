@@ -35,8 +35,13 @@ Mỗi mục: chọn gì, vì sao, đánh đổi gì, và điều kiện nào th�
 min 1547ms. Lượt không gọi tool đạt dưới 2s; lượt phải tra sổ tay thì chưa, vì còn
 đi qua hai vòng LLM. Xem README mục Latency.
 
-**Đổi ý khi**: FAL đo qua mic vẫn > 2s sau khi đã áp hết tối ưu ở mục 3 và 4, hoặc
-yêu cầu chuyển sang hội thoại chồng lấn thật sự (cả hai cùng nói).
+**Đo qua mic thật, 14 lượt**: nhánh local p50 **1000ms** (n=9, dải 906–1094) — đạt.
+Nhánh `search_internet` p50 **4938ms** (n=6), chưa lần nào dưới 4 giây. Điều kiện đổi ý
+bên dưới vì thế mới thoả một nửa: cascaded đủ nhanh cho phần chạy trên máy, chỗ vượt
+mốc nằm ở lượt gọi ra ngoài — và realtime API cũng không sửa được chỗ đó.
+
+**Đổi ý khi**: FAL đo qua mic vẫn > 2s **trên nhánh local** sau khi đã áp hết tối ưu ở
+mục 3 và 4, hoặc yêu cầu chuyển sang hội thoại chồng lấn thật sự (cả hai cùng nói).
 
 ## 2. OpenRouter cho STT và LLM
 

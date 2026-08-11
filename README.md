@@ -73,7 +73,7 @@ Windows: `$env:PYTHONIOENCODING="utf-8"` nếu console vỡ font tiếng Việt.
 Không cần API key, không cần mic:
 
 ```bash
-.venv/bin/python -m pytest        # 107 test
+.venv/bin/python -m pytest        # 115 test
 .venv/bin/python -m ruff check .  # lint
 ```
 
@@ -85,7 +85,10 @@ Không cần API key, không cần mic:
 | `tests/test_metrics.py` | đo FAL đúng frame đầu tiên, bỏ lượt khi barge-in, probe không chặn frame |
 | `tests/test_vehicle.py` | câu xác nhận `speech` có mặt trên đường thành công, vắng mặt trên đường lỗi và trên tool tra cứu |
 | `tests/test_ui.py` | dashboard không nuốt frame, tab treo không chặn pipeline, mọi hình dạng kết quả tool đều đọc được |
+| `tests/test_guardrails.py` | text từ Internet không ra lệnh được; trần lượt/token mỗi phiên |
 | `tests/test_config.py` | placeholder key trong .env.example phải bị coi như thiếu key |
+| `tests/test_audio_device.py` | `INPUT_DEVICE` là tên thì khớp đúng mic, không khớp nhầm loa cùng tên |
+| `tests/test_entrypoint.py` | `python -m voice_agent` import được — chuỗi import nặng không test nào khác đụng tới |
 | `tests/test_packaging.py` | mọi thư viện được import đều có trong requirements — bắt lỗi "chạy máy tôi thì được" |
 
 ## Cấu hình
@@ -151,7 +154,12 @@ chấm luôn độ chính xác STT.
 **FAL p50 1016–1281 ms** — đạt mốc <2 s cả 4 lần — p95 2078–5719 ms, **5/5 lượt đạt**.
 
 Đuôi p95 luôn là lượt tra sổ tay, lượt duy nhất còn phải qua hai vòng LLM. Nó dao động
-mạnh: một lần chạy ra 5719 ms. Cách loại trừ nguyên nhân và toàn bộ số đo:
+mạnh: một lần chạy ra 5719 ms.
+
+**Đo qua mic thật** (14 lượt liên tiếp, tách theo nhánh — không lặp lại được nên để
+riêng, không trộn vào bảng trên): điều khiển xe và hội thoại **p50 1000 ms** (n=9, dải
+906–1094, chín lượt gói gọn trong 188 ms); `search_internet` **p50 4938 ms** (n=6, dải
+4281–6000), chưa lần nào dưới 4 giây. Toàn bộ số đo và cách loại trừ nguyên nhân:
 [`docs/ket-qua.md`](docs/ket-qua.md).
 
 Từng chặng riêng (`scripts/bench.py --repeat 3`, n=9):
@@ -254,7 +262,7 @@ voice_agent/
 ├── metrics.py           LatencyProbe — đo FAL
 ├── schema.py            hàm Python → JSON schema cho LLM
 ├── tts.py               chọn engine TTS + EdgeTTSService
-├── audio.py             thu mic ở tần số gốc, tự hạ tần số
+├── audio.py             chọn mic theo tên, thu ở tần số gốc rồi tự hạ tần số
 ├── ui.py                dashboard: event bus + UIProbe
 ├── budget.py            trần chi phí LLM mỗi phiên
 ├── static/index.html    trang dashboard (1 file, không framework)
@@ -271,7 +279,7 @@ scripts/bench.py         đo latency + xếp hạng giọng, không cần mic
 scripts/demo_ui.py       phát lại hội thoại mẫu vào dashboard, không cần mic
 scripts/e2e.py           chạy nguyên pipeline với giọng thu sẵn
 scripts/mic.py           tìm thiết bị mic thật sự nghe được
-tests/                   107 test, không cần API key
+tests/                   115 test, không cần API key
 docs/                    cài đặt · kiến trúc · quyết định · kết quả đo
 ```
 
