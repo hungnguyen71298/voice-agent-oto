@@ -117,23 +117,28 @@
   <p class="lede">Từ lúc hệ thống xác định người dùng ngừng nói, đến frame âm thanh
      đầu tiên phát ra loa.</p>
   <div class="row">
-    <div><div class="big win">1016–1281<small>ms · p50, bốn lần chạy</small></div></div>
-    <div><div class="big">2.1–5.7<small>giây · p95</small></div></div>
-    <div><div class="big win">4/4<small>lần đạt mốc &lt;2 s ở p50</small></div></div>
+    <div><div class="big win">1000<small>ms · p50 mic thật, nhánh local (n=9)</small></div></div>
+    <div><div class="big win">1016–1281<small>ms · p50 e2e, bốn lần chạy</small></div></div>
+    <div><div class="big">4938<small>ms · p50 nhánh Internet (n=6)</small></div></div>
   </div>
   <ul>
     <li>Đo bởi <strong>chính pipeline</strong>, đặt ngay trước transport output nên nó
         thấy đúng frame sắp ra loa.</li>
+    <li><strong>4/4 lần chạy e2e đạt mốc &lt;2 s ở p50.</strong> p95 của các lần chạy đó
+        là <strong>2.1–5.7 giây</strong>.</li>
     <li>p95 là lượt tra sổ tay — lượt duy nhất còn phải qua <strong>hai vòng LLM</strong>,
         vì kết quả tìm kiếm cần model tóm tắt.</li>
     <li>Một lần chạy vọt lên <strong>5719 ms</strong>. Đo riêng chặng đó mới loại được
         nghi ngờ guardrail: bọc văn bản tốn <strong>+32 ms</strong>, còn lượt chậm nhất
         lại rơi vào bản <em>không</em> bọc. Chặng này dao động sẵn.</li>
-    <li>Nhánh tra Internet còn chậm hơn: <strong>4282 · 5312 · 6000 ms</strong> đo qua mic
-        thật, vì riêng Tavily đã tốn p50 <strong>1859 ms</strong>. Đây là chỗ câu đệm sẽ vá.</li>
-    <li class="note"><strong>Giới hạn của chính con số này:</strong> mỗi lần chạy chỉ 5 lượt,
+    <li><strong>Đo qua mic thật</strong>, 14 lượt liên tiếp, tách theo nhánh:
+        điều khiển xe <strong>p50 1000 ms</strong> (n=9, dải 906–1094) — chín lượt gói gọn
+        trong 188 ms; <code>search_internet</code> <strong>p50 4938 ms</strong>
+        (n=6, dải 4281–6000). Toàn bộ đuôi latency nằm ở nhánh gọi ra ngoài, riêng Tavily
+        đã tốn p50 <strong>1859 ms</strong>. Đây là chỗ câu đệm sẽ vá.</li>
+    <li class="note"><strong>Giới hạn của chính con số này:</strong> mỗi lần chạy e2e chỉ 5 lượt,
         nên "p95" ở đây thực chất là giá trị lớn nhất. Muốn có phân vị thật phải chạy 30 lượt
-        trở lên — tôi chưa làm.</li>
+        trở lên — tôi chưa làm. Số mic thật thì không lặp lại được nên để riêng, không trộn.</li>
     <li class="note">Chưa trừ device output buffer (~20–40 ms), nên số báo lạc quan hơn
         thực tế chừng đó.</li>
   </ul>

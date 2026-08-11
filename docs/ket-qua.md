@@ -45,6 +45,38 @@ giấu nó đi thì lần sau không ai biết biên độ thật của chặng 
 
 **Chưa trừ**: device output buffer (~20-40 ms). Số báo lạc quan hơn thực tế chừng đó.
 
+### Đo qua mic thật
+
+Bảng trên là `scripts/e2e.py` — audio bơm từ file, mỗi lần đúng 5 lượt, lặp lại được.
+Bảng dưới là hội thoại thật qua micro, 11/08/2026, 14 lượt liên tiếp trong một phiên.
+Cùng probe, cùng định nghĩa FAL; khác ở chỗ không lặp lại được, nên để riêng chứ không
+trộn vào bảng trên.
+
+| nhánh | n | p50 | dải |
+|---|---|---|---|
+| lượt đầu (nạp model) | 1 | — | 2844 ms |
+| điều khiển xe + hội thoại | 9 | **1000 ms** | 906 – 1094 ms |
+| `search_internet` | 3 | 4563 ms | 4281 – 5688 ms |
+
+Chín lượt nhánh local nằm gọn trong khoảng **188 ms** — chặt hơn hẳn bảng e2e, vì e2e
+trộn cả lượt tra sổ tay vào chung một phân vị. Tách hai nhánh ra thì thấy rõ: phần
+điều khiển xe ổn định, còn toàn bộ đuôi latency nằm ở nhánh phải gọi ra ngoài.
+
+Gộp với ba lượt Internet đo hôm trước (4282 · 5312 · 6000 ms) thành n=6:
+**p50 4938 ms, dải 4281 – 6000 ms**. Chưa lần nào dưới 4 giây. Đây là điểm yếu lớn
+nhất còn lại, và cách vá thì biết rồi — phát câu đệm ("Để tôi tra nhé") ngay khi tool
+bắt đầu chạy, để FAL tính từ câu đệm chứ không phải từ câu trả lời. Chưa làm.
+
+Hai chuyện khác lộ ra ở phiên này, không phải số nhưng đáng ghi:
+
+- **Whisper bịa câu khi im lặng.** Nó tự sinh ra `Cảm ơn các bạn đã theo dõi và hẹn gặp
+  lại.` — câu kết video YouTube, thứ đầy trong dữ liệu huấn luyện. Không có wake word thì
+  câu ma này vẫn thành một lượt hợp lệ.
+- **Model tự suy khi STT sai tên riêng.** "hẻm 162" nghe thành "hàng 162", model dựng
+  thành `search_internet("Hãng xe 162 ở đâu")` và Tavily trả về bến xe Thủ Đức — sai hoàn
+  toàn nhưng nghe rất trôi. Ngược lại, khi câu nát hẳn (`Đốc cá sổ gỡ lại`) thì nó **hỏi
+  lại** đúng như quy tắc trong prompt. Ranh giới nguy hiểm là câu sai vừa đủ để nghe hợp lý.
+
 ## 2. Từng chặng
 
 `scripts/bench.py --repeat 3`, n=9:
