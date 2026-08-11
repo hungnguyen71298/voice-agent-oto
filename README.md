@@ -112,6 +112,7 @@ Mọi thứ đổi bằng biến môi trường, không sửa code:
 | `UI_HOST` | `127.0.0.1` | Docker đặt `0.0.0.0` |
 | `MAX_TURNS` | `200` | trần lượt mỗi phiên, `0` để tắt |
 | `MAX_TOKENS` | `500000` | trần token mỗi phiên, `0` để tắt |
+| `LOG_LEVEL` | `INFO` | `DEBUG` để xem frame và metrics từng chặng |
 
 ```bash
 LLM_MODEL=openai/gpt-5-mini .venv/bin/python -m voice_agent

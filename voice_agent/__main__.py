@@ -5,6 +5,8 @@ import os
 import sys
 from pathlib import Path
 
+from loguru import logger
+
 # Must run BEFORE importing app: the Windows console defaults to cp1252 and printing
 # Vietnamese crashes it.
 sys.stdout.reconfigure(encoding="utf-8")
@@ -21,6 +23,11 @@ sys.stdout.reconfigure(encoding="utf-8")
 _cwd = str(Path.cwd())
 sys.path[:] = [p for p in sys.path if p not in ("", ".", _cwd)]
 os.environ["NLTK_DISABLE_IMPORT_SECURITY"] = "1"
+
+# Pipecat logs through loguru, whose default sink is stderr at DEBUG — that prints every
+# frame link and every per-service metric. INFO keeps the dashboard URL and the turns.
+logger.remove()
+logger.add(sys.stderr, level=os.environ.get("LOG_LEVEL", "INFO"))
 
 from .app import run  # noqa: E402
 
