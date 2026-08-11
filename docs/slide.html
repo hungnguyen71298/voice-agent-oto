@@ -280,7 +280,44 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
 
 <!-- 10 -->
 <section class="slide">
-  <h2><span class="n">09</span>Knowledge base: dữ liệu thật</h2>
+  <h2><span class="n">09</span>Bảy tool — và cái gì <em>không</em> phải lựa chọn</h2>
+  <div class="row">
+    <table>
+      <tr><th>Tool</th><th>Tham số</th><th>speech</th></tr>
+      <tr><td><code>set_ac</code></td><td>on, temperature 16–30</td><td class="win">có</td></tr>
+      <tr><td><code>adjust_ac_temperature</code></td><td>delta</td><td class="win">có</td></tr>
+      <tr><td><code>set_fan</code></td><td>level 0–5</td><td class="win">có</td></tr>
+      <tr><td><code>adjust_fan</code></td><td>delta</td><td class="win">có</td></tr>
+      <tr><td><code>set_window</code></td><td>position, opening 0–100</td><td class="win">có</td></tr>
+      <tr class="bad"><td><code>search_manual</code></td><td>query — BM25, local</td><td>không</td></tr>
+      <tr class="bad"><td><code>search_internet</code></td><td>query — Tavily REST</td><td>không</td></tr>
+    </table>
+    <div class="card col" style="flex:1;min-width:20em">
+      <h3>850 chunk là kết quả, không phải tham số</h3>
+      <p>Không có nút "chunk size". Tách theo <strong>dòng trống</strong> — markdown sổ tay đã
+         có sẵn ranh giới ngữ nghĩa, cắt theo 512 token là tự vẽ lại ranh giới đã có.</p>
+      <p>Knob duy nhất là <code>MIN_CHUNK_CHARS=150</code>: BM25 chuẩn hóa theo độ dài nên
+         tiêu đề trơ trọi và chú thích ảnh <strong>thắng điểm nhờ ngắn</strong> dù không chứa
+         câu trả lời.</p>
+    </div>
+  </div>
+  <ul>
+    <li>Có cả <code>set_*</code> lẫn <code>adjust_*</code> vì người lái nói cả hai kiểu —
+        "để 22 độ" và "giảm 2 độ". <code>adjust_*</code> gọi lại <code>set_*</code>, nên
+        <strong>chỉ một chỗ validate</strong>.</li>
+    <li>Năm tool điều khiển trả kèm <code>speech</code> để đọc thẳng; hai tool tra cứu
+        <strong>cố ý không có</strong> — chúng cần LLM tóm tắt. Nhánh lỗi cũng không có.</li>
+    <li><code>search_internet</code> gọi REST Tavily bằng <code>urllib</code> thuần, timeout 8s,
+        <strong>không bao giờ raise</strong> — lỗi mạng trả dict để agent nói "tôi tra không được"
+        thay vì chết pipeline. Không có key thì trả mock, <em>có key là chạy thật, không sửa code</em>.</li>
+    <li class="note">Và nó là thủ phạm của FAL p50 4938 ms: một vòng HTTP ra ngoài nằm giữa
+        lượt nói, chưa có câu đệm che.</li>
+  </ul>
+</section>
+
+<!-- 11 -->
+<section class="slide">
+  <h2><span class="n">10</span>Knowledge base: dữ liệu thật</h2>
   <p class="lede">Sổ tay hướng dẫn sử dụng <strong>VinFast VF 8 (2026)</strong> — 12 chương,
      530k ký tự, 850 chunk. Không mock.</p>
   <ul>
@@ -296,9 +333,9 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
   </ul>
 </section>
 
-<!-- 11 -->
+<!-- 12 -->
 <section class="slide">
-  <h2><span class="n">10</span>Hai lỗi chỉ lộ khi chạy thật</h2>
+  <h2><span class="n">11</span>Hai lỗi chỉ lộ khi chạy thật</h2>
   <div class="row">
     <div class="card col" style="flex:1">
       <h3>VAD chưa từng được nối</h3>
@@ -319,9 +356,9 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
      <em>Một lần chạy thật thì bắt được cả hai.</em></p>
 </section>
 
-<!-- 12 -->
+<!-- 13 -->
 <section class="slide">
-  <h2><span class="n">11</span>Chi phí</h2>
+  <h2><span class="n">12</span>Chi phí</h2>
   <div class="row">
     <table>
       <tr><th></th><th>đơn giá</th><th>tiền/lượt</th></tr>
@@ -345,9 +382,9 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
   </ul>
 </section>
 
-<!-- 13 -->
+<!-- 14 -->
 <section class="slide">
-  <h2><span class="n">12</span>Guardrail — và giới hạn của nó</h2>
+  <h2><span class="n">13</span>Guardrail — và giới hạn của nó</h2>
   <p class="lede">Đề bài không yêu cầu. Ghi ra để phân biệt rõ cái đã chặn và cái chưa.</p>
   <div class="row">
     <div class="col" style="flex:1">
@@ -381,9 +418,9 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
   </div>
 </section>
 
-<!-- 14 -->
+<!-- 15 -->
 <section class="slide">
-  <h2><span class="n">13</span>Đã làm và chưa làm</h2>
+  <h2><span class="n">14</span>Đã làm và chưa làm</h2>
   <div class="row">
     <div class="col" style="flex:1">
       <h3 class="note win">Đã có</h3>
@@ -418,10 +455,10 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
   </div>
 </section>
 
-<!-- 14 -->
+<!-- 16 -->
 <section class="slide">
   <h1>Demo</h1>
-  <pre>$ python -m voice_agent
+  <pre>PS&gt; <b>.venv\Scripts\python -m voice_agent</b>
 STT=openai/whisper-large-v3
 LLM=google/gemini-3.5-flash-lite
 TTS=piper/vi_VN-vais1000-medium
@@ -435,13 +472,14 @@ Start speaking (Ctrl+C to quit)...</pre>
     <li>"Mở cửa sổ" → <span class="note">phải hỏi lại, không được đoán</span></li>
     <li>"Áp suất lốp bao nhiêu là đúng" → <span class="note">tra sổ tay VF 8</span></li>
   </ul>
-  <p class="note">Không có mic: <code>python scripts/e2e.py</code> ·
-     chỉ xem giao diện: <code>python scripts/demo_ui.py</code></p>
+  <p class="note">Không có mic: <code>.venv\Scripts\python scripts/e2e.py</code> ·
+     chỉ xem giao diện: <code>.venv\Scripts\python scripts/demo_ui.py</code> ·
+     Linux/macOS đổi thành <code>.venv/bin/python</code></p>
 </section>
 
 <footer>
   <span>Voice Agent trên ô tô</span>
-  <span><b id="cur">1</b> / <span id="tot">14</span> &nbsp;·&nbsp; ← → để chuyển</span>
+  <span><b id="cur">1</b> / <span id="tot">16</span> &nbsp;·&nbsp; ← → để chuyển</span>
 </footer>
 
 <script>
