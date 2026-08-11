@@ -135,7 +135,7 @@ def build_task(transport: BaseTransport | None = None) -> tuple[PipelineTask, La
     task = PipelineTask(
         Pipeline([transport.input(), ui.MicGate(),
                   VADProcessor(vad_analyzer=SileroVADAnalyzer()),
-                  stt, ui.UIProbe(), agg.user(), budget.Gate(money), llm,
+                  stt, ui.SilenceFilter(), ui.UIProbe(), agg.user(), budget.Gate(money), llm,
                   budget.Counter(money), tts, probe, ui.UIProbe(),
                   transport.output(), agg.assistant()]),
         params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),

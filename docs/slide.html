@@ -315,7 +315,7 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
       <p>Mà <strong>hiển thị transcript là yêu cầu bắt buộc</strong> mục 2 đề bài.</p>
     </div>
   </div>
-  <p class="lede">115 unit test xanh vẫn không bắt được lỗi nào trong hai lỗi này.
+  <p class="lede">120 unit test xanh vẫn không bắt được lỗi nào trong hai lỗi này.
      <em>Một lần chạy thật thì bắt được cả hai.</em></p>
 </section>
 
@@ -398,7 +398,7 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
         <li><strong>Barge-in</strong> (mục 8) — cắt lời agent giữa câu, đã thử bằng
             hội thoại thật, lượt bị cắt được loại khỏi thống kê FAL</li>
         <li>Guardrail: trần chi phí phiên, bọc văn bản nguồn ngoài</li>
-        <li>115 test + lint, không cần key hay mic</li>
+        <li>120 test + lint, không cần key hay mic</li>
       </ul>
     </div>
     <div class="col" style="flex:1">
@@ -410,8 +410,9 @@ app.py:  push_frame(TTSSpeakFrame(speech, <b>append_to_context=True</b>))
             phải đổi nhà cung cấp, <code>/audio/transcriptions</code> chỉ nhận file</li>
         <li><strong>Whisper local</strong>: đã thử, CPU 2063 ms — chậm gấp 3 lần gọi API</li>
         <li><strong>Wake word.</strong> Khi im lặng, Whisper tự bịa ra câu kết video
-            YouTube ("Cảm ơn các bạn đã theo dõi") và nó thành một lượt hợp lệ —
-            đo được trong phiên mic thật, chưa có gì chặn</li>
+            YouTube ("Cảm ơn các bạn đã theo dõi", "subscribe cho kênh...") và nó thành
+            một lượt hợp lệ. Đang chặn bằng danh sách câu đã gặp; câu lạ vẫn lọt, wake
+            word mới là lời giải</li>
       </ul>
     </div>
   </div>

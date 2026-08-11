@@ -73,7 +73,7 @@ Windows: `$env:PYTHONIOENCODING="utf-8"` nếu console vỡ font tiếng Việt.
 Không cần API key, không cần mic:
 
 ```bash
-.venv/bin/python -m pytest        # 115 test
+.venv/bin/python -m pytest        # 120 test
 .venv/bin/python -m ruff check .  # lint
 ```
 
@@ -85,7 +85,7 @@ Không cần API key, không cần mic:
 | `tests/test_metrics.py` | đo FAL đúng frame đầu tiên, bỏ lượt khi barge-in, probe không chặn frame |
 | `tests/test_vehicle.py` | câu xác nhận `speech` có mặt trên đường thành công, vắng mặt trên đường lỗi và trên tool tra cứu |
 | `tests/test_ui.py` | dashboard không nuốt frame, tab treo không chặn pipeline, mọi hình dạng kết quả tool đều đọc được |
-| `tests/test_guardrails.py` | text từ Internet không ra lệnh được; trần lượt/token mỗi phiên |
+| `tests/test_guardrails.py` | text từ Internet không ra lệnh được; trần lượt/token mỗi phiên; câu Whisper bịa lúc im lặng không thành lượt |
 | `tests/test_config.py` | placeholder key trong .env.example phải bị coi như thiếu key |
 | `tests/test_audio_device.py` | `INPUT_DEVICE` là tên thì khớp đúng mic, không khớp nhầm loa cùng tên |
 | `tests/test_entrypoint.py` | `python -m voice_agent` import được — chuỗi import nặng không test nào khác đụng tới |
@@ -279,7 +279,7 @@ scripts/bench.py         đo latency + xếp hạng giọng, không cần mic
 scripts/demo_ui.py       phát lại hội thoại mẫu vào dashboard, không cần mic
 scripts/e2e.py           chạy nguyên pipeline với giọng thu sẵn
 scripts/mic.py           tìm thiết bị mic thật sự nghe được
-tests/                   115 test, không cần API key
+tests/                   120 test, không cần API key
 docs/                    cài đặt · kiến trúc · quyết định · kết quả đo
 ```
 

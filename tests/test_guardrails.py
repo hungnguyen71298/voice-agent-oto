@@ -1,4 +1,5 @@
-"""Two guardrails: untrusted text cannot issue orders, and one session cannot spend forever.
+"""Three guardrails: untrusted text cannot issue orders, one session cannot spend forever,
+and silence cannot become a turn.
 
 Both are cheap to break by accident — a new tool that forgets to be marked untrusted, a
 pipeline reorder that puts the gate after the model — so each gets a test that fails loudly.
@@ -6,12 +7,17 @@ pipeline reorder that puts the gate after the model — so each gets a test that
 import asyncio
 
 import pytest
-from pipecat.frames.frames import LLMContextFrame, MetricsFrame, TTSSpeakFrame
+from pipecat.frames.frames import (
+    LLMContextFrame,
+    MetricsFrame,
+    TranscriptionFrame,
+    TTSSpeakFrame,
+)
 from pipecat.metrics.metrics import LLMTokenUsage, LLMUsageMetricsData
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.frame_processor import FrameDirection
 
-from voice_agent import budget, tools
+from voice_agent import budget, tools, ui
 
 # --- prompt injection ------------------------------------------------------------------
 
@@ -98,3 +104,28 @@ def test_zero_disables_a_limit(field):
     """`MAX_TOKENS=0` must mean unlimited, not 'blocked from the first word'."""
     b = budget.Budget(**{field: 0, "max_turns" if field == "max_tokens" else "max_tokens": 10})
     assert not b.exhausted()
+
+
+# --- silence that Whisper turned into speech --------------------------------------------
+
+
+def said(text: str) -> TranscriptionFrame:
+    return TranscriptionFrame(text=text, user_id="", timestamp="")
+
+
+@pytest.mark.parametrize("text", [
+    "Hãy subscribe cho kênh Ghiền Mì Gõ Để không bỏ lỡ những video hấp dẫn",
+    "Cảm ơn các bạn đã theo dõi và hẹn gặp lại.",
+])
+def test_invented_sentences_never_become_a_turn(text):
+    """Both strings are real: Whisper returned them while nobody was speaking."""
+    assert not drive(ui.SilenceFilter(), said(text))
+
+
+@pytest.mark.parametrize("text", [
+    "hệ thống theo dõi áp suất lốp báo gì",  # the blocklist must not eat the TPMS question
+    "Ghế lái",                               # a real two-word turn — no length filter
+    "mở cửa sổ",
+])
+def test_real_speech_still_gets_through(text):
+    assert drive(ui.SilenceFilter(), said(text))

@@ -70,8 +70,12 @@ bắt đầu chạy, để FAL tính từ câu đệm chứ không phải từ c
 Hai chuyện khác lộ ra ở phiên này, không phải số nhưng đáng ghi:
 
 - **Whisper bịa câu khi im lặng.** Nó tự sinh ra `Cảm ơn các bạn đã theo dõi và hẹn gặp
-  lại.` — câu kết video YouTube, thứ đầy trong dữ liệu huấn luyện. Không có wake word thì
-  câu ma này vẫn thành một lượt hợp lệ.
+  lại.` và `Hãy subscribe cho kênh Ghiền Mì Gõ...` — câu kết video YouTube, thứ đầy trong
+  dữ liệu huấn luyện. Không chặn thì câu ma này thành một lượt hợp lệ: tốn một lời gọi
+  LLM và agent trả lời vào không khí giữa lúc demo. `ui.SilenceFilter` bỏ transcript khớp
+  danh sách câu đã gặp, đặt ngay sau STT nên lượt không mở ra. Danh sách chỉ nhận nguyên
+  câu, không nhận mảnh — `theo dõi` sẽ nuốt mất "hệ thống theo dõi áp suất lốp", một câu
+  hỏi thật về chính chiếc xe này. Trần: câu bịa kiểu mới vẫn lọt, chỗ đó cần wake word.
 - **Model tự suy khi STT sai tên riêng.** "hẻm 162" nghe thành "hàng 162", model dựng
   thành `search_internet("Hãng xe 162 ở đâu")` và Tavily trả về bến xe Thủ Đức — sai hoàn
   toàn nhưng nghe rất trôi. Ngược lại, khi câu nát hẳn (`Đốc cá sổ gỡ lại`) thì nó **hỏi

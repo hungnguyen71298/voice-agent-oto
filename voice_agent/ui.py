@@ -124,6 +124,41 @@ class MicGate(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
+# Whisper learnt Vietnamese from subtitles, so handed near-silence it returns the
+# sign-off lines that end a video. Match whole phrases only: "theo dõi" on its own would
+# also swallow "hệ thống theo dõi áp suất lốp", which is a real question about this car.
+# ponytail: a phrase not on this list still gets through — upgrade is a wake word, or an
+# energy gate in front of STT. The dashboard mute button covers the gap meanwhile.
+HALLUCINATIONS = (
+    "cảm ơn các bạn đã theo dõi",
+    "hẹn gặp lại",
+    "đăng ký kênh",
+    "ghiền mì gõ",
+    "subscribe",
+    "bỏ lỡ những video",
+)
+
+
+def is_hallucination(text: str) -> bool:
+    """True for subtitle boilerplate no driver ever says to a car."""
+    return any(phrase in text.lower() for phrase in HALLUCINATIONS)
+
+
+class SilenceFilter(FrameProcessor):
+    """Drops what Whisper invented out of silence, before it becomes a turn.
+
+    Sits between STT and the aggregator. The transcription is already paid for by then,
+    but the turn never opens: no LLM call, no reply read aloud, nothing on the dashboard.
+    """
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+        if isinstance(frame, TranscriptionFrame) and is_hallucination(frame.text):
+            logger.info(f"Bỏ câu Whisper tự bịa lúc im lặng: {frame.text!r}")
+            return
+        await self.push_frame(frame, direction)
+
+
 async def _mic(_request: web.Request) -> web.Response:
     """Toggle the microphone from the dashboard."""
     global _muted
